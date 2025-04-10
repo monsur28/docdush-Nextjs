@@ -79,7 +79,6 @@ export default function DashboardPage() {
       <DashboardLayout>
         {/* Centered loader within the layout */}
         <div className="flex items-center justify-center h-[calc(100vh-8rem)]">
-          {" "}
           {/* Adjust height as needed */}
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
         </div>

@@ -55,20 +55,34 @@ export default function ProjectsPage() {
       setIsLoading(false);
     }
   };
+
   useEffect(() => {
     fetchProjects();
   }, []);
+
   const toggleProjectFeatured = async (id, currentFeaturedState) => {
-    /* ... */
     setTogglingId(id);
     const newFeaturedState = !currentFeaturedState;
-    setProjects(
-      projects.map((project) =>
-        project._id === id
-          ? { ...project, featured: newFeaturedState }
-          : project
-      )
-    );
+
+    // If a project is being marked as featured, unfeature the others
+    if (newFeaturedState) {
+      setProjects((prevProjects) =>
+        prevProjects.map((project) =>
+          project._id === id
+            ? { ...project, featured: true }
+            : { ...project, featured: false }
+        )
+      );
+    } else {
+      setProjects(
+        projects.map((project) =>
+          project._id === id
+            ? { ...project, featured: newFeaturedState }
+            : project
+        )
+      );
+    }
+
     try {
       await axios.patch(`/api/projects/${id}`, { featured: newFeaturedState });
       if (newFeaturedState) {
@@ -96,10 +110,12 @@ export default function ProjectsPage() {
       setTogglingId(null);
     }
   };
+
   const openDeleteDialog = (project) => {
     /* ... */ setProjectToDelete(project);
     setShowDeleteDialog(true);
   };
+
   const executeDelete = async () => {
     /* ... */ if (!projectToDelete) return;
     const { _id, title } = projectToDelete;
@@ -126,6 +142,7 @@ export default function ProjectsPage() {
       setDeletingId(null);
     }
   };
+
   const getStatusBadge = (status) => {
     /* ... */ switch (status) {
       case "In Progress":
@@ -134,8 +151,8 @@ export default function ProjectsPage() {
             variant="outline"
             className="bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200"
           >
-            <span className="mr-1.5 h-2 w-2 rounded-full bg-amber-500 animate-pulse"></span>{" "}
-            In Progress{" "}
+            <span className="mr-1.5 h-2 w-2 rounded-full bg-amber-500 animate-pulse"></span>
+            In Progress
           </Badge>
         );
       case "Completed":
@@ -144,8 +161,8 @@ export default function ProjectsPage() {
             variant="outline"
             className="bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200"
           >
-            <span className="mr-1.5 h-2 w-2 rounded-full bg-emerald-500"></span>{" "}
-            Completed{" "}
+            <span className="mr-1.5 h-2 w-2 rounded-full bg-emerald-500"></span>
+            Completed
           </Badge>
         );
       case "Published":
@@ -154,8 +171,8 @@ export default function ProjectsPage() {
             variant="outline"
             className="bg-green-100 text-green-700 border-green-300 hover:bg-green-200"
           >
-            <span className="mr-1.5 h-2 w-2 rounded-full bg-green-500"></span>{" "}
-            Published{" "}
+            <span className="mr-1.5 h-2 w-2 rounded-full bg-green-500"></span>
+            Published
           </Badge>
         );
       case "Draft":
@@ -164,8 +181,8 @@ export default function ProjectsPage() {
             variant="outline"
             className="bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
           >
-            <span className="mr-1.5 h-2 w-2 rounded-full bg-gray-500"></span>{" "}
-            Draft{" "}
+            <span className="mr-1.5 h-2 w-2 rounded-full bg-gray-500"></span>
+            Draft
           </Badge>
         );
       default:
@@ -174,8 +191,8 @@ export default function ProjectsPage() {
             variant="outline"
             className="bg-rose-100 text-rose-700 border-rose-300 hover:bg-rose-200"
           >
-            <span className="mr-1.5 h-2 w-2 rounded-full bg-rose-500"></span>{" "}
-            {status || "Pending"}{" "}
+            <span className="mr-1.5 h-2 w-2 rounded-full bg-rose-500"></span>
+            {status || "Pending"}
           </Badge>
         );
     }
@@ -207,9 +224,7 @@ export default function ProjectsPage() {
                 </div>
               ) : projects.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-64 p-6 text-center">
-                  {" "}
                   <div className="w-16 h-16 mb-4 rounded-full bg-cyan-100 flex items-center justify-center">
-                    {" "}
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       className="h-8 w-8 text-cyan-600"
@@ -217,33 +232,28 @@ export default function ProjectsPage() {
                       viewBox="0 0 24 24"
                       stroke="currentColor"
                     >
-                      {" "}
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
                         d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                      />{" "}
-                    </svg>{" "}
-                  </div>{" "}
+                      />
+                    </svg>
+                  </div>
                   <h3 className="text-xl font-medium text-gray-900">
-                    {" "}
-                    No projects yet{" "}
-                  </h3>{" "}
+                    No projects yet
+                  </h3>
                   <p className="mt-2 text-gray-500">
-                    {" "}
-                    Get started by creating your first project{" "}
-                  </p>{" "}
+                    Get started by creating your first project
+                  </p>
                   <Link href="/dashboard/projects/create" className="mt-4">
-                    {" "}
                     <Button
                       size="sm"
                       className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700"
                     >
-                      {" "}
-                      Create Project{" "}
-                    </Button>{" "}
-                  </Link>{" "}
+                      Create Project
+                    </Button>
+                  </Link>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -295,8 +305,7 @@ export default function ProjectsPage() {
                                   : "bg-gradient-to-br from-gray-400 to-gray-500"
                               }`}
                             >
-                              {" "}
-                              {index + 1}{" "}
+                              {index + 1}
                             </div>
                           </td>
                           <td className="py-3 px-6">
@@ -315,15 +324,13 @@ export default function ProjectsPage() {
                                   {project.title}
                                 </div>
                                 <div className="text-xs text-gray-500">
-                                  {" "}
-                                  {project.category || "Uncategorized"}{" "}
+                                  {project.category || "Uncategorized"}
                                 </div>
                                 <div className="text-xs text-gray-500">
-                                  {" "}
-                                  Created:{" "}
+                                  Created:
                                   {new Date(
                                     project.createdAt
-                                  ).toLocaleDateString()}{" "}
+                                  ).toLocaleDateString()}
                                 </div>
                               </div>
                             </div>
@@ -377,8 +384,7 @@ export default function ProjectsPage() {
                                   className="text-amber-600 hover:text-amber-800 hover:bg-amber-100 h-8 w-8"
                                   title="Edit"
                                 >
-                                  {" "}
-                                  <Edit2 className="h-4 w-4" />{" "}
+                                  <Edit2 className="h-4 w-4" />
                                 </Button>
                               </Link>
                               <Button
