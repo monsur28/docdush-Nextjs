@@ -1,13 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
+  reactStrictMode: false,
+  output: "standalone", // good for VPS deployments
+  experimental: {
+    workerThreads: false, // optional: reduce resource use
+  },
   images: {
     domains: [
       "i.ibb.co",
       "i.ibb.co.com",
       "www.adaptiveus.com",
       "www.twintechsoft.com",
-    ], // Add the domain to the allowed list
+    ],
   },
 };
 

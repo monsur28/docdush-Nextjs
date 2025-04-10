@@ -684,26 +684,27 @@ export default function HomePage() {
             </section>
 
             {/* --- Call to Action --- */}
-            <section className="py-16 bg-[#0b1622] text-white">
+            <section className="py-16 ">
               <div className="container mx-auto px-4">
                 <div className="max-w-4xl mx-auto text-center">
                   <h2 className="text-3xl font-bold mb-6">
                     Ready to Build Something Amazing?
                   </h2>
-                  <p className="text-gray-300 mb-8 text-lg">
+                  <p className="text-gray-800 mb-8 text-lg">
                     Explore our comprehensive documentation and start building
                     your next project with confidence.
                   </p>
                   <div className="flex flex-wrap justify-center gap-4">
-                    <Button className="bg-[#82b440] hover:bg-[#73a139] text-white px-8 py-6 h-auto text-lg">
-                      Browse All Projects
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="border-white/30 text-black hover:bg-white/10 hover:text-white px-8 py-6 h-auto text-lg"
-                    >
-                      Submit Your Project
-                    </Button>
+                    <Link href="/projects">
+                      <Button className="bg-[#82b440] hover:bg-[#73a139] text-white px-8 py-6 h-auto text-lg">
+                        Browse All Projects
+                      </Button>
+                    </Link>
+                    <Link href="/contact">
+                      <Button className="bg-white hover:bg-[#73a139] border border-gray-500 text-black px-8 py-6 h-auto text-lg">
+                        Contact Us
+                      </Button>
+                    </Link>
                   </div>
                 </div>
               </div>

@@ -49,6 +49,7 @@ const getInitials = (name) => {
 export default function ProfilePage() {
   const { user, loading: authLoading, error: authError } = useAuth();
   const router = useRouter();
+
   // No useToast hook needed for sonner
 
   // Profile form state
@@ -650,7 +651,7 @@ export default function ProfilePage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <ul className="space-y-3 text-sm text-muted-foreground">
+                    {/* <ul className="space-y-3 text-sm text-muted-foreground">
                       <li>
                         <span className="font-medium text-foreground">
                           Account Created:
@@ -671,7 +672,7 @@ export default function ProfilePage() {
                             ).toLocaleString()
                           : "N/A"}
                       </li>
-                    </ul>
+                    </ul> */}
                   </CardContent>
                 </Card>
               </TabsContent>
