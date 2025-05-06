@@ -1,12 +1,12 @@
-"use client"; // Required for useState and useEffect
+"use client";
 
 import React, { useState, useEffect } from "react"; // Import hooks
 import Navbar from "@/components/Navbar";
-import Footer from "../../components/Footer"; // Adjust path if needed
 import Image from "next/image";
 import axiosSecure from "@/lib/axiosSecure"; // Import your axios instance
 import { toast } from "sonner"; // Import toast for error messages
 import { Loader2, AlertTriangle } from "lucide-react"; // Icons for loading/error states
+import Footer from "@/components/Footer";
 
 export default function AboutPage() {
   // State for team members, loading status, and errors
