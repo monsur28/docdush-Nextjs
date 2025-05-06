@@ -27,11 +27,10 @@ export default function LoginPage() {
       setError(""); // Clear previous error
       setLoading(true);
       await signIn(email, password);
-      toast({
-        title: "Login Successful",
+      toast.success("Login Successful", {
         description: "You are now logged in.",
-        status: "success",
       });
+
       router.push("/dashboard");
     } catch (error) {
       const errorMessage =

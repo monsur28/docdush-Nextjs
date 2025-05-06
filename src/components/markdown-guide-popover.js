@@ -69,7 +69,7 @@ export function MarkdownGuidePopover() {
                 `inline code`
               </code>
               <span>
-                →{" "}
+                →
                 <code className="bg-slate-100 px-1 rounded text-xs">
                   inline code
                 </code>

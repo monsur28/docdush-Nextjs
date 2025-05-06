@@ -1,7 +1,7 @@
 "use client";
 
 import Navbar from "@/components/Navbar";
-import Footer from "../../components/footer";
+import Footer from "../../components/Footer";
 import { useState } from "react";
 
 export default function ContactPage() {

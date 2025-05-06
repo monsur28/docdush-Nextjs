@@ -1,9 +1,7 @@
-/** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
-  output: "standalone", // good for VPS deployments
   experimental: {
-    workerThreads: false, // optional: reduce resource use
+    workerThreads: false,
   },
   images: {
     domains: [
@@ -11,6 +9,7 @@ const nextConfig = {
       "i.ibb.co.com",
       "www.adaptiveus.com",
       "www.twintechsoft.com",
+      "res.cloudinary.com",
     ],
   },
 };

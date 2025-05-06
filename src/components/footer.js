@@ -6,14 +6,34 @@ import Link from "next/link";
 
 const Footer = () => {
   const [currentYear, setCurrentYear] = useState(null);
+  const [siteInfo, setSiteInfo] = useState(null);
 
   useEffect(() => {
     setCurrentYear(new Date().getFullYear());
+
+    const fetchSiteInfo = async () => {
+      try {
+        const res = await fetch("/api/site-info");
+        const data = await res.json();
+        if (data.success) {
+          setSiteInfo(data.data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch site info:", error);
+      }
+    };
+
+    fetchSiteInfo();
   }, []);
 
   if (currentYear === null) {
-    return null; // or a loading spinner
+    return null; // or show skeleton/spinner
   }
+
+  const logoSrc =
+    siteInfo?.siteImage ||
+    "https://i.ibb.co/dqGXxqn/Doc-Dush-twintech-removebg-preview.png";
+  const siteName = siteInfo?.siteName || "DocDush";
 
   return (
     <footer className="bg-white rounded-lg shadow-sm dark:bg-gray-900 m-4">
@@ -24,17 +44,22 @@ const Footer = () => {
             className="flex items-center mb-4 sm:mb-0 space-x-3 rtl:space-x-reverse"
           >
             <Image
-              src="https://i.ibb.co/dqGXxqn/Doc-Dush-twintech-removebg-preview.png"
-              className="h-8 w-auto"
+              src={logoSrc}
+              alt={`${siteName} Logo`}
               width={32}
               height={32}
-              alt="DocDush Logo"
+              className="h-8 w-auto"
             />
             <span className="self-center text-2xl font-semibold whitespace-nowrap dark:text-white">
-              DocDush
+              {siteName}
             </span>
           </Link>
           <ul className="flex flex-wrap items-center mb-6 text-sm font-medium text-gray-500 sm:mb-0 dark:text-gray-400">
+            <li>
+              <Link href="/support" className="hover:underline me-4 md:me-6">
+                Support
+              </Link>
+            </li>
             <li>
               <Link href="/projects" className="hover:underline me-4 md:me-6">
                 Projects
@@ -56,7 +81,7 @@ const Footer = () => {
         <span className="block text-sm text-gray-500 sm:text-center dark:text-gray-400">
           © {currentYear}{" "}
           <Link href="/" className="hover:underline">
-            DocDush™
+            {siteName}™
           </Link>
           . All Rights Reserved.
         </span>

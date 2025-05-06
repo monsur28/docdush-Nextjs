@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import axios from "axios";
 import {
   ArrowLeft,
   Upload,
@@ -20,6 +19,13 @@ import {
   Loader2,
   LinkIcon,
   Info,
+  GripVertical,
+  BookOpen,
+  ImageIcon,
+  Video,
+  HelpCircle,
+  Code as CodeIcon,
+  Keyboard, // Icon for Markdown toggle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,16 +47,123 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Switch } from "@/components/ui/switch"; // Keep Switch for Markdown toggle
 import DashboardLayout from "@/components/DashboardLayout";
-import { Toaster } from "@/components/ui/sonner"; // Assuming sonner is correctly imported for toast
 import { toast } from "sonner";
-import { MarkdownCodeHelper } from "@/components/markdown-code-helper";
+import axiosSecure from "@/lib/axiosSecure";
+import { RichTextEditor } from "@/components/rich-text-editor";
 import { MarkdownGuidePopover } from "@/components/markdown-guide-popover";
+import { MarkdownCodeHelper } from "@/components/markdown-code-helper";
 
-// --- Get ImgBB API Key from environment variables ---
-// IMPORTANT: This key WILL BE EXPOSED in the browser bundle.
-// Consider a backend proxy route for production security.
-const imgbbApiKey = process.env.NEXT_PUBLIC_IMGBB_API_KEY;
+// Helper function to generate unique IDs
+const generateId = () =>
+  `section-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+// --- Initial Documentation Sections ---
+const initialDocumentationSections = [
+  // Added showMarkdown state, removed editorMode
+  {
+    id: "introduction",
+    title: "Introduction",
+    icon: "FileText",
+    content: "<p></p>",
+    markdownContent: "",
+    showMarkdown: false,
+    isDeletable: true,
+    isCustom: false,
+  },
+  {
+    id: "prerequisites",
+    title: "Prerequisites",
+    icon: "CheckCircle2",
+    content: "<p></p>",
+    markdownContent: "",
+    showMarkdown: false,
+    isDeletable: true,
+    isCustom: false,
+  },
+  {
+    id: "installation",
+    title: "Installation",
+    icon: "Box",
+    content: "<p></p>",
+    markdownContent: "",
+    showMarkdown: false,
+    isDeletable: true,
+    isCustom: false,
+  },
+  {
+    id: "frontend-setup",
+    title: "Frontend Configuration",
+    icon: "Monitor",
+    content: "<p></p>",
+    markdownContent: "",
+    showMarkdown: false,
+    isDeletable: true,
+    isCustom: false,
+  },
+  {
+    id: "backend-setup",
+    title: "Backend Configuration",
+    icon: "Server",
+    content: "<p></p>",
+    markdownContent: "",
+    showMarkdown: false,
+    isDeletable: true,
+    isCustom: false,
+  },
+  {
+    id: "database",
+    title: "Database Setup",
+    icon: "Database",
+    content: "<p></p>",
+    markdownContent: "",
+    showMarkdown: false,
+    isDeletable: true,
+    isCustom: false,
+  },
+  {
+    id: "authentication",
+    title: "Authentication",
+    icon: "Lock",
+    content: "<p></p>",
+    markdownContent: "",
+    showMarkdown: false,
+    isDeletable: true,
+    isCustom: false,
+  },
+];
+
+// --- Icon Mapping ---
+const sectionIcons = {
+  FileText: <FileText className="h-5 w-5" />,
+  CheckCircle2: <CheckCircle2 className="h-5 w-5" />,
+  Box: <Box className="h-5 w-5" />,
+  Monitor: <Monitor className="h-5 w-5" />,
+  Server: <Server className="h-5 w-5" />,
+  Database: <Database className="h-5 w-5" />,
+  Lock: <Lock className="h-5 w-5" />,
+  Coffee: <Coffee className="h-5 w-5" />,
+  BookOpen: <BookOpen className="h-5 w-5" />,
+};
+const getSectionIcon = (iconName) => {
+  return sectionIcons[iconName] || sectionIcons.BookOpen;
+};
+
+// --- Category Options ---
+const categoryOptions = [
+  "Full Stack App",
+  "Frontend App",
+  "Backend API",
+  "E-commerce",
+  "Media Platform",
+  "SaaS",
+  "Portfolio",
+  "Blog",
+  "Utility Tool",
+  "Game",
+  "Other",
+];
 
 export default function NewProjectPage() {
   const router = useRouter();
@@ -62,76 +175,202 @@ export default function NewProjectPage() {
     title: "",
     description: "",
     category: "",
-    image: null, // <-- *** FIX: Changed initial value from "" to null ***
+    otherCategory: "",
+    image: null,
     version: "1.0.0",
     author: "Envato Elite Author",
-    demoUrl: "", // New field for demo URL
+    demoUrl: "",
     frontendDependencies: [],
     backendDependencies: [],
-    introContent: "",
-    prerequisitesContent: "",
-    installationContent: "",
-    frontendConfigContent: "",
-    backendConfigContent: "",
-    databaseSetupContent: "",
-    authenticationContent: "",
+    documentationSections: initialDocumentationSections,
     faqEntries: [],
   });
-
   const [errors, setErrors] = useState({});
   const [nextDependencyId, setNextDependencyId] = useState(1);
   const [nextFaqId, setNextFaqId] = useState(1);
-  const [imagePreview, setImagePreview] = useState(formData.image); // Will now correctly initialize to null
+  const [imagePreview, setImagePreview] = useState(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-  // --- Handlers (handleChange, handleSelectChange remain the same) ---
+  // --- Handlers ---
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) {
       setErrors((prev) => {
-        const ne = { ...prev };
-        delete ne[name];
-        return ne;
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
       });
     }
   };
-
   const handleSelectChange = (name, value) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) {
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === "category" && value !== "Other" && { otherCategory: "" }),
+    }));
+    if (errors[name] || errors.otherCategory) {
       setErrors((prev) => {
-        const ne = { ...prev };
-        delete ne[name];
-        return ne;
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        delete newErrors.otherCategory;
+        return newErrors;
+      });
+    }
+  };
+  const handleOtherCategoryChange = (e) => {
+    const { value } = e.target;
+    setFormData((prev) => ({ ...prev, otherCategory: value }));
+    if (errors.otherCategory) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors.otherCategory;
+        return newErrors;
+      });
+    }
+  };
+  const handleSectionTitleChange = (id, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      documentationSections: prev.documentationSections.map((section) =>
+        section.id === id ? { ...section, title: value } : section
+      ),
+    }));
+    const errorKey = `doc_title_${id}`;
+    if (errors[errorKey]) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[errorKey];
+        return newErrors;
       });
     }
   };
 
-  // --- *** UPDATED Image Handler *** ---
+  // Handler for toggling Markdown visibility
+  const handleMarkdownVisibilityToggle = (sectionId, show) => {
+    setFormData((prev) => ({
+      ...prev,
+      documentationSections: prev.documentationSections.map((section) =>
+        section.id === sectionId ? { ...section, showMarkdown: show } : section
+      ),
+    }));
+  };
+
+  // Rich Text Editor Changes - Primary Content Source
+  const handleRichTextChange = (sectionId, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      documentationSections: prev.documentationSections.map((section) =>
+        section.id === sectionId ? { ...section, content: value } : section
+      ),
+    }));
+    const errorKey = `doc_content_${sectionId}`;
+    if (errors[errorKey]) {
+      // Clear error if content is modified
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[errorKey];
+        return newErrors;
+      });
+    }
+  };
+
+  // Markdown Textarea Changes - Helper Input
+  const handleMarkdownChange = (sectionId, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      documentationSections: prev.documentationSections.map((section) =>
+        section.id === sectionId
+          ? { ...section, markdownContent: value }
+          : section
+      ),
+    }));
+  };
+
+  // Insert Markdown Snippets into the Markdown Textarea
+  const handleInsertMarkdown = (sectionId, markdownToInsert) => {
+    setFormData((prev) => {
+      const updatedSections = prev.documentationSections.map((section) => {
+        if (section.id === sectionId) {
+          const currentMarkdown = section.markdownContent || "";
+          const newMarkdownContent =
+            currentMarkdown + (currentMarkdown ? "\n" : "") + markdownToInsert;
+          return { ...section, markdownContent: newMarkdownContent };
+        }
+        return section;
+      });
+      return { ...prev, documentationSections: updatedSections };
+    });
+    const textarea = document.getElementById(`markdown-${sectionId}`);
+    if (textarea) {
+      setTimeout(() => {
+        textarea.focus();
+        textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+      }, 0);
+    }
+  };
+
+  // Add Section - Initialize with showMarkdown: false
+  const handleAddSection = () => {
+    const newSection = {
+      id: generateId(),
+      title: "New Section",
+      icon: "BookOpen",
+      content: "<p></p>",
+      markdownContent: "",
+      showMarkdown: false,
+      isDeletable: true,
+      isCustom: true,
+    };
+    setFormData((prev) => ({
+      ...prev,
+      documentationSections: [...prev.documentationSections, newSection],
+    }));
+    setTimeout(() => {
+      const element = document.getElementById(newSection.id);
+      element?.scrollIntoView({ behavior: "smooth", block: "center" });
+      const titleInput = document.getElementById(`title-${newSection.id}`);
+      titleInput?.focus();
+    }, 100);
+  };
+
+  // Remove Section (Keep as is)
+  const handleRemoveSection = (idToRemove) => {
+    setFormData((prev) => ({
+      ...prev,
+      documentationSections: prev.documentationSections.filter(
+        (section) => section.id !== idToRemove
+      ),
+    }));
+    const titleErrorKey = `doc_title_${idToRemove}`;
+    const contentErrorKey = `doc_content_${idToRemove}`;
+    setErrors((prev) => {
+      const newErrors = { ...prev };
+      delete newErrors[titleErrorKey];
+      delete newErrors[contentErrorKey];
+      return newErrors;
+    });
+  };
+
+  // --- Image Handler (Keep as is) ---
   const handleImageChange = async (e) => {
     const file = e.target.files?.[0];
-    const currentImageOnError = formData.image; // Store current actual image URL (or null) for error fallback
-
-    // Clear previous errors and reset preview/state if no file selected
+    const currentImageOnError = formData.image;
     setErrors((prev) => {
       const ne = { ...prev };
       delete ne.image;
       return ne;
     });
     if (!file) {
-      // If user cancels file selection, revert preview to the last known good state
-      setImagePreview(formData.image); // Revert to last saved image URL or null
+      setImagePreview(formData.image);
       return;
     }
-
-    // Validation
     if (file.size > 2 * 1024 * 1024) {
-      // 2MB limit
       setErrors((prev) => ({
         ...prev,
         image: "Image size should not exceed 2MB",
       }));
+      setImagePreview(currentImageOnError);
       return;
     }
     if (
@@ -143,84 +382,68 @@ export default function NewProjectPage() {
         "image/webp",
       ].includes(file.type)
     ) {
-      // Added webp
       setErrors((prev) => ({
         ...prev,
         image: "Invalid file type (JPG, PNG, GIF, SVG, WEBP allowed)",
       }));
+      setImagePreview(currentImageOnError);
       return;
     }
-
-    // Show preview immediately
     const reader = new FileReader();
     reader.onloadend = () => {
       if (reader.result) {
-        // Ensure reader.result is not null
-        setImagePreview(reader.result.toString()); // Convert ArrayBuffer/Blob to string if necessary
+        setImagePreview(reader.result.toString());
       } else {
-        setImagePreview(currentImageOnError); // Fallback if reading fails
+        setImagePreview(currentImageOnError);
       }
     };
     reader.onerror = () => {
-      // Handle file reading errors
       console.error("Error reading file for preview.");
-      setImagePreview(currentImageOnError); // Fallback on read error
+      setImagePreview(currentImageOnError);
       setErrors((prev) => ({
         ...prev,
         image: "Could not preview the selected file.",
       }));
     };
     reader.readAsDataURL(file);
-
-    // Start upload process
     setIsUploadingImage(true);
-
     const uploadFormData = new FormData();
     uploadFormData.append("image", file);
-
     try {
-      if (!imgbbApiKey) {
-        throw new Error(
-          "ImgBB API Key not configured in environment variables (NEXT_PUBLIC_IMGBB_API_KEY)"
-        );
-      }
-
-      const response = await axios.post(
-        `https://api.imgbb.com/1/upload?key=${imgbbApiKey}`,
-        uploadFormData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      if (response.data && response.data.success) {
-        const uploadedUrl = response.data.data.url;
-        console.log("Image uploaded successfully:", uploadedUrl);
-        setFormData((prev) => ({ ...prev, image: uploadedUrl })); // Save the actual URL
-        setImagePreview(uploadedUrl); // Ensure preview shows the final URL
+      const response = await axiosSecure.post("/api/upload", uploadFormData);
+      if (response.data.url) {
+        const uploadedUrl = response.data.url;
+        setFormData((prev) => ({ ...prev, image: uploadedUrl }));
+        setImagePreview(uploadedUrl);
         toast.success("Image uploaded!");
       } else {
         throw new Error(
-          response.data?.error?.message || "ImgBB API returned an error"
+          response.data?.message ||
+            "Image upload API did not return a valid URL."
         );
       }
     } catch (error) {
       console.error("Image upload failed:", error);
+      const apiErrorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "An unknown error occurred during upload.";
       setErrors((prev) => ({
         ...prev,
-        image: "Image upload failed. Please try again.",
+        image: `Image upload failed: ${apiErrorMessage}. Please try again.`,
       }));
-      setImagePreview(currentImageOnError); // Revert preview to previous actual URL (or null) on error
-      setFormData((prev) => ({ ...prev, image: currentImageOnError })); // Revert formData on error
-      toast.error("Image upload failed."); // Add error toast
+      setImagePreview(currentImageOnError);
+      setFormData((prev) => ({ ...prev, image: currentImageOnError }));
+      toast.error(`Image upload failed: ${apiErrorMessage}`);
     } finally {
       setIsUploadingImage(false);
+      if (e.target) {
+        e.target.value = "";
+      }
     }
   };
 
-  // --- Dependency Handlers (Keep as before) ---
+  // --- Dependency & FAQ Handlers (Keep as is) ---
   const handleAddDependency = (type) => {
     const newDependency = { id: nextDependencyId, name: "", version: "" };
     setNextDependencyId(nextDependencyId + 1);
@@ -228,7 +451,6 @@ export default function NewProjectPage() {
       type === "frontend" ? "frontendDependencies" : "backendDependencies";
     setFormData((prev) => ({ ...prev, [key]: [...prev[key], newDependency] }));
   };
-
   const handleRemoveDependency = (type, id) => {
     const key =
       type === "frontend" ? "frontendDependencies" : "backendDependencies";
@@ -237,16 +459,15 @@ export default function NewProjectPage() {
       [key]: prev[key].filter((dep) => dep.id !== id),
     }));
   };
-
   const handleDependencyChange = (type, id, field, value) => {
     const key =
       type === "frontend" ? "frontendDependencies" : "backendDependencies";
     const errorKey = `${type.slice(0, 2)}_dep_${field}_${id}`;
     if (errors[errorKey]) {
       setErrors((prev) => {
-        const ne = { ...prev };
-        delete ne[errorKey];
-        return ne;
+        const newErrors = { ...prev };
+        delete newErrors[errorKey];
+        return newErrors;
       });
     }
     setFormData((prev) => ({
@@ -256,8 +477,6 @@ export default function NewProjectPage() {
       ),
     }));
   };
-
-  // --- FAQ Handlers (Keep as before) ---
   const handleAddFaqEntry = () => {
     const newFaq = { id: nextFaqId, question: "", answer: "" };
     setNextFaqId(nextFaqId + 1);
@@ -266,20 +485,18 @@ export default function NewProjectPage() {
       faqEntries: [...prev.faqEntries, newFaq],
     }));
   };
-
   const handleRemoveFaqEntry = (id) => {
     setFormData((prev) => ({
       ...prev,
       faqEntries: prev.faqEntries.filter((faq) => faq.id !== id),
     }));
     setErrors((prev) => {
-      const ne = { ...prev };
-      delete ne[`faq_q_${id}`];
-      delete ne[`faq_a_${id}`];
-      return ne;
+      const newErrors = { ...prev };
+      delete newErrors[`faq_q_${id}`];
+      delete newErrors[`faq_a_${id}`];
+      return newErrors;
     });
   };
-
   const handleFaqChange = (id, field, value) => {
     setFormData((prev) => ({
       ...prev,
@@ -290,78 +507,91 @@ export default function NewProjectPage() {
     const errorKey = `faq_${field.slice(0, 1)}_${id}`;
     if (errors[errorKey]) {
       setErrors((prev) => {
-        const ne = { ...prev };
-        delete ne[errorKey];
-        return ne;
+        const newErrors = { ...prev };
+        delete newErrors[errorKey];
+        return newErrors;
       });
     }
   };
 
-  // --- New handler for inserting code templates ---
-  const handleInsertCodeTemplate = (sectionName, codeTemplate) => {
-    const currentContent = formData[sectionName] || "";
-    const newContent =
-      currentContent + (currentContent ? "\n\n" : "") + codeTemplate;
-    setFormData((prev) => ({ ...prev, [sectionName]: newContent }));
-  };
-
-  // --- Step Navigation (Keep nextStep, prevStep) ---
+  // --- Step Navigation (Keep as is) ---
   const nextStep = () => {
     const { isValid, stepErrors } = runValidationForStep(currentStep);
-    // Clear previous errors specific to this step before setting new ones
-    const currentStepFields = getCurrentStepFields(currentStep);
+    const currentFields = getCurrentStepFields(currentStep);
     const clearedErrors = { ...errors };
-    currentStepFields.forEach((field) => delete clearedErrors[field]);
-
+    currentFields.forEach((fieldKey) => {
+      if (fieldKey.includes("*")) {
+        const prefix = fieldKey.split("*")[0];
+        Object.keys(clearedErrors).forEach((key) => {
+          if (key.startsWith(prefix)) {
+            delete clearedErrors[key];
+          }
+        });
+      } else {
+        delete clearedErrors[fieldKey];
+      }
+    });
     setErrors({ ...clearedErrors, ...stepErrors });
-
     if (isValid) {
       if (currentStep < 3) {
         setCurrentStep(currentStep + 1);
         window.scrollTo(0, 0);
       }
     } else {
-      window.scrollTo(0, 0); // Scroll up to show errors
+      window.scrollTo(0, 0);
+      const firstErrorKey = Object.keys(stepErrors)[0];
+      if (firstErrorKey) {
+        let elementId = firstErrorKey;
+        if (firstErrorKey.startsWith("doc_"))
+          elementId = firstErrorKey.split("_")[2];
+        if (
+          firstErrorKey.startsWith("fe_dep") ||
+          firstErrorKey.startsWith("be_dep")
+        )
+          elementId = firstErrorKey.substring(
+            0,
+            firstErrorKey.lastIndexOf("_")
+          );
+        if (firstErrorKey.startsWith("faq_"))
+          elementId = `faq_q_${firstErrorKey.split("_")[2]}`;
+        const errorElement = document.getElementById(elementId);
+        errorElement?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
     }
   };
-
   const prevStep = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
       window.scrollTo(0, 0);
     }
   };
-
-  // Helper to get fields relevant to the current validation step
   const getCurrentStepFields = (step) => {
-    if (step === 1)
-      return ["title", "description", "category", "image", "demoUrl"];
+    if (step === 1) {
+      return [
+        "title",
+        "description",
+        "category",
+        "otherCategory",
+        "image",
+        "demoUrl",
+      ];
+    }
     if (step === 2) {
-      const depErrors = [];
-      formData.frontendDependencies.forEach((dep) => {
-        depErrors.push(`fe_dep_name_${dep.id}`);
-        depErrors.push(`fe_dep_version_${dep.id}`);
-      });
-      formData.backendDependencies.forEach((dep) => {
-        depErrors.push(`be_dep_name_${dep.id}`);
-        depErrors.push(`be_dep_version_${dep.id}`);
-      });
-      return ["version", ...depErrors];
+      return [
+        "version",
+        "fe_dep_name_*",
+        "fe_dep_version_*",
+        "be_dep_name_*",
+        "be_dep_version_*",
+      ];
     }
     if (step === 3) {
-      const faqErrors = [];
-      formData.faqEntries.forEach((faq) => {
-        faqErrors.push(`faq_q_${faq.id}`);
-        faqErrors.push(`faq_a_${faq.id}`);
-      });
-      // Add documentation content fields if they have validation rules
-      const docFields = Object.keys(docLabels);
-      return [...docFields, ...faqErrors];
+      return ["doc_title_*", "doc_content_*", "faq_q_*", "faq_a_*"];
     }
     return [];
   };
 
-  // --- Updated Validation Logic to include demoUrl ---
+  // --- Validation Logic ---
   const runValidationForStep = (step) => {
     const stepErrors = {};
     let isValid = true;
@@ -383,16 +613,21 @@ export default function NewProjectPage() {
       if (!formData.category) {
         stepErrors.category = "Category is required";
         isValid = false;
-      }
-      // Check if there's an image upload error stored in the main errors state
-      if (errors.image) {
-        stepErrors.image = errors.image; // Propagate existing image error
+      } else if (
+        formData.category === "Other" &&
+        !formData.otherCategory.trim()
+      ) {
+        stepErrors.otherCategory = "Please specify the category name";
         isValid = false;
       }
-      // Validate demo URL if provided (optional field)
+      if (errors.image) {
+        stepErrors.image = errors.image; /* isValid = false; */
+      }
+      if (!formData.image && !errors.image) {
+        /* stepErrors.image = "Project image is required"; isValid = false; */
+      }
       if (formData.demoUrl && !isValidUrl(formData.demoUrl)) {
-        stepErrors.demoUrl =
-          "Please enter a valid URL (e.g., https://example.com)";
+        stepErrors.demoUrl = "Please enter a valid URL";
         isValid = false;
       }
     }
@@ -401,66 +636,61 @@ export default function NewProjectPage() {
         stepErrors.version = "Version is required";
         isValid = false;
       }
-      // Only validate dependencies if they exist
-      if (formData.frontendDependencies.length > 0) {
-        formData.frontendDependencies.forEach((dep, index) => {
-          if (!dep.name.trim()) {
-            stepErrors[`fe_dep_name_${dep.id}`] = `FE Dep #${
-              index + 1
-            } Name required`;
-            isValid = false;
-          }
-          if (!dep.version.trim()) {
-            stepErrors[`fe_dep_version_${dep.id}`] = `FE Dep #${
-              index + 1
-            } Version required`;
-            isValid = false;
-          }
-        });
-      }
-      if (formData.backendDependencies.length > 0) {
-        formData.backendDependencies.forEach((dep, index) => {
-          if (!dep.name.trim()) {
-            stepErrors[`be_dep_name_${dep.id}`] = `BE Dep #${
-              index + 1
-            } Name required`;
-            isValid = false;
-          }
-          if (!dep.version.trim()) {
-            stepErrors[`be_dep_version_${dep.id}`] = `BE Dep #${
-              index + 1
-            } Version required`;
-            isValid = false;
-          }
-        });
-      }
+      formData.frontendDependencies.forEach((dep, index) => {
+        if (!dep.name.trim()) {
+          stepErrors[`fe_dep_name_${dep.id}`] =
+            `FE Dep #${index + 1} Name required`;
+          isValid = false;
+        }
+        if (!dep.version.trim()) {
+          stepErrors[`fe_dep_version_${dep.id}`] =
+            `FE Dep #${index + 1} Version required`;
+          isValid = false;
+        }
+      });
+      formData.backendDependencies.forEach((dep, index) => {
+        if (!dep.name.trim()) {
+          stepErrors[`be_dep_name_${dep.id}`] =
+            `BE Dep #${index + 1} Name required`;
+          isValid = false;
+        }
+        if (!dep.version.trim()) {
+          stepErrors[`be_dep_version_${dep.id}`] =
+            `BE Dep #${index + 1} Version required`;
+          isValid = false;
+        }
+      });
     }
     if (step === 3) {
-      // Only validate FAQs if they exist
-      if (formData.faqEntries.length > 0) {
-        formData.faqEntries.forEach((faq, index) => {
-          if (!faq.question.trim()) {
-            stepErrors[`faq_q_${faq.id}`] = `FAQ #${
-              index + 1
-            } Question required`;
-            isValid = false;
-          }
-          if (!faq.answer.trim()) {
-            stepErrors[`faq_a_${faq.id}`] = `FAQ #${index + 1} Answer required`;
-            isValid = false;
-          }
-        });
-      }
-      // Add validation for documentation sections if needed (e.g., minimum length)
-      // Example:
-      // if (!formData.introContent.trim()) {
-      //     stepErrors.introContent = "Introduction content is required";
-      //     isValid = false;
-      // }
+      // ** UPDATED: Validate only RTE content ('content') **
+      formData.documentationSections.forEach((section, index) => {
+        if (!section.title.trim()) {
+          stepErrors[`doc_title_${section.id}`] =
+            `Section #${index + 1} Title required`;
+          isValid = false;
+        }
+        const plainTextContent = section.content.replace(/<[^>]*>/g, "").trim(); // Check HTML content
+        if (!plainTextContent) {
+          stepErrors[`doc_content_${section.id}`] =
+            `Section #${index + 1} Content cannot be empty`;
+          isValid = false;
+        }
+      });
+      formData.faqEntries.forEach((faq, index) => {
+        if (!faq.question.trim()) {
+          stepErrors[`faq_q_${faq.id}`] = `FAQ #${index + 1} Question required`;
+          isValid = false;
+        }
+        if (!faq.answer.trim()) {
+          stepErrors[`faq_a_${faq.id}`] = `FAQ #${index + 1} Answer required`;
+          isValid = false;
+        }
+      });
     }
     return { isValid, stepErrors };
   };
 
+  // --- Final Validation Before Submit ---
   const validateAll = () => {
     const { isValid: step1Valid, stepErrors: step1Errors } =
       runValidationForStep(1);
@@ -469,170 +699,133 @@ export default function NewProjectPage() {
     const { isValid: step3Valid, stepErrors: step3Errors } =
       runValidationForStep(3);
     const allErrors = { ...step1Errors, ...step2Errors, ...step3Errors };
-    // Ensure existing image upload errors are retained
     if (errors.image && !allErrors.image) {
       allErrors.image = errors.image;
     }
+    if (
+      formData.category === "Other" &&
+      !formData.otherCategory.trim() &&
+      !allErrors.otherCategory
+    ) {
+      allErrors.otherCategory = "Please specify the category name";
+    }
     const overallValid =
-      step1Valid && step2Valid && step3Valid && !allErrors.image; // Ensure image has no errors too
+      step1Valid &&
+      step2Valid &&
+      step3Valid &&
+      !allErrors.image &&
+      !allErrors.otherCategory;
     setErrors(allErrors);
-    return {
-      overallValid,
-      firstInvalidStep:
-        !step1Valid || allErrors.image // Go to step 1 if image error exists
-          ? 1
-          : !step2Valid
-          ? 2
-          : !step3Valid
-          ? 3
-          : null,
-    };
+    let firstInvalidStep = null;
+    if (!step1Valid || allErrors.image || allErrors.otherCategory)
+      firstInvalidStep = 1;
+    else if (!step2Valid) firstInvalidStep = 2;
+    else if (!step3Valid) firstInvalidStep = 3;
+    return { overallValid, firstInvalidStep };
   };
 
-  // Helper function to validate URL (basic check)
+  // Helper function to validate URL (Keep as is)
   const isValidUrl = (string) => {
-    // Allow empty or null strings
     if (!string) return true;
     try {
       const url = new URL(string);
-      // Basic check for http or https protocol
       return url.protocol === "http:" || url.protocol === "https:";
     } catch (_) {
       return false;
     }
   };
 
-  // --- Submission (Updated to include demoUrl) ---
+  // --- Submission ---
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Clear previous submit error
     setErrors((prev) => {
-      const ne = { ...prev };
-      delete ne.submit;
-      return ne;
+      const newErrors = { ...prev };
+      delete newErrors.submit;
+      return newErrors;
     });
-
     const { overallValid, firstInvalidStep } = validateAll();
-
     if (!overallValid) {
       setCurrentStep(firstInvalidStep);
       window.scrollTo(0, 0);
       setErrors((prev) => ({
         ...prev,
-        submit: "Please fix the errors highlighted above before submitting.",
+        submit: "Please fix the errors highlighted above.",
       }));
       toast.error("Validation failed. Please check the form.");
       return;
     }
-
-    // Double check if image is still uploading
     if (isUploadingImage) {
       setErrors((prev) => ({
         ...prev,
-        submit: "Please wait for the image to finish uploading.",
+        submit: "Please wait for image upload.",
       }));
       toast.warning("Image is still uploading.");
-      window.scrollTo(0, 0); // Scroll to top where error might appear
+      window.scrollTo(0, 0);
       return;
     }
-
     setIsSubmitting(true);
 
-    // Prepare data, ensure dependencies and FAQs don't include the temporary 'id'
+    const finalCategory =
+      formData.category === "Other"
+        ? formData.otherCategory
+        : formData.category;
     const projectDataToSubmit = {
       title: formData.title,
       description: formData.description,
-      category: formData.category,
-      image: formData.image, // Will be null or the ImgBB URL
+      category: finalCategory,
+      image: formData.image,
       version: formData.version,
       author: formData.author,
-      demoUrl: formData.demoUrl || null, // Send null if empty
+      demoUrl: formData.demoUrl || null,
       packageRequirements: {
-        frontend: formData.frontendDependencies.map(({ id, ...rest }) => rest), // Exclude 'id'
-        backend: formData.backendDependencies.map(({ id, ...rest }) => rest), // Exclude 'id'
+        frontend: formData.frontendDependencies.map(({ id, ...rest }) => rest),
+        backend: formData.backendDependencies.map(({ id, ...rest }) => rest),
       },
-      documentationSections: [
-        {
-          id: "introduction",
-          title: "Introduction",
-          icon: "FileText", // Keep icon name as string for API
-          content: formData.introContent,
-          supportsMarkdown: false,
-        },
-        {
-          id: "prerequisites",
-          title: "Prerequisites",
-          icon: "CheckCircle2",
-          content: formData.prerequisitesContent,
-          supportsMarkdown: true,
-        },
-        {
-          id: "installation",
-          title: "Installation",
-          icon: "Box",
-          content: formData.installationContent,
-          supportsMarkdown: true,
-        },
-        {
-          id: "frontend-setup",
-          title: "Frontend Configuration",
-          icon: "Monitor",
-          content: formData.frontendConfigContent,
-          supportsMarkdown: true,
-        },
-        {
-          id: "backend-setup",
-          title: "Backend Configuration",
-          icon: "Server",
-          content: formData.backendConfigContent,
-          supportsMarkdown: true,
-        },
-        {
-          id: "database",
-          title: "Database Setup",
-          icon: "Database",
-          content: formData.databaseSetupContent,
-          supportsMarkdown: true,
-        },
-        {
-          id: "authentication",
-          title: "Authentication",
-          icon: "Lock",
-          content: formData.authenticationContent,
-          supportsMarkdown: true,
-        },
-      ],
+      // ** UPDATED: Submit only the primary RTE content ('content') **
+      documentationSections: formData.documentationSections.map(
+        ({
+          isDeletable,
+          isCustom,
+          markdownContent,
+          showMarkdown,
+          /* ignore markdownContent & showMarkdown */ ...rest
+        }) => ({
+          ...rest, // id, title, icon, content (from RTE)
+          supportsMarkdown: true, // Still indicate it *could* have come from markdown conceptually
+          supportsHtml: true,
+        })
+      ),
       faqs: formData.faqEntries.map(({ id, ...rest }) => ({
-        // Exclude 'id'
         ...rest,
         supportsMarkdown: false,
+        supportsHtml: false,
       })),
-      status: "Published", // Or maybe "Draft" initially?
+      status: "Published",
     };
 
     try {
-      console.log("Submitting project to API:", projectDataToSubmit);
-      // Ensure the API endpoint exists and is correct
-      const response = await axios.post("/api/projects", projectDataToSubmit);
-
-      // Check response carefully based on your API's success indication
+      const response = await axiosSecure.post(
+        "/api/projects",
+        projectDataToSubmit
+      );
       if (response.status === 201 && response.data?.success) {
-        toast.success("Project Created Successfully!"); // Use toast here
+        toast.success("Project Created Successfully!");
         router.push("/dashboard/projects");
       } else {
-        // Attempt to get a more specific error message from the API response
         const errorMessage =
           response.data?.message || `API Error (Status: ${response.status})`;
         throw new Error(errorMessage);
       }
     } catch (error) {
       console.error("Error creating project:", error);
-      // Extract message from Axios error response if available
       const apiErrorMessage =
         error.response?.data?.message ||
         error.message ||
         "An unknown error occurred";
-      setErrors({ submit: `Failed to create project: ${apiErrorMessage}` });
+      setErrors((prev) => ({
+        ...prev,
+        submit: `Failed to create project: ${apiErrorMessage}`,
+      }));
       toast.error(`Failed to create project: ${apiErrorMessage}`);
       window.scrollTo(0, 0);
     } finally {
@@ -640,12 +833,13 @@ export default function NewProjectPage() {
     }
   };
 
-  // --- Helper Render Functions (Keep renderDependencies) ---
+  // --- Helper Render Functions (Keep renderDependencies as is) ---
   const renderDependencies = (type) => {
     const dependencies =
       formData[
         type === "frontend" ? "frontendDependencies" : "backendDependencies"
       ];
+    const prefix = type === "frontend" ? "fe" : "be";
     return (
       <div className="mt-8">
         <div className="flex items-center justify-between mb-4">
@@ -655,12 +849,12 @@ export default function NewProjectPage() {
               : "Backend Dependencies"}
           </h4>
           <Button
-            type="button" // Ensure it doesn't submit the form
+            type="button"
             variant="outline"
             size="sm"
             onClick={() => handleAddDependency(type)}
             className="gap-1"
-            disabled={isSubmitting} // Disable while submitting
+            disabled={isSubmitting}
           >
             <Plus size={16} /> Add Dependency
           </Button>
@@ -669,98 +863,112 @@ export default function NewProjectPage() {
           <CardContent className="p-4 space-y-4">
             {dependencies.length === 0 ? (
               <div className="text-sm text-muted-foreground text-center py-6 border border-dashed rounded-md">
-                No {type} dependencies added yet
+                No {type} dependencies added yet.
               </div>
             ) : (
-              dependencies.map(
-                (
-                  dep,
-                  index // Add index for better error messages if needed
-                ) => (
-                  <div
-                    key={dep.id}
-                    className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start" // Use items-start for alignment with error messages
-                  >
-                    <div className="sm:col-span-5">
-                      <Label
-                        htmlFor={`${type}_dep_name_${dep.id}`}
-                        className="sr-only"
+              dependencies.map((dep, index) => (
+                <div
+                  key={dep.id}
+                  id={`${prefix}_dep_${dep.id}`}
+                  className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start border-b pb-3 last:border-b-0 last:pb-0"
+                >
+                  <div className="sm:col-span-5">
+                    <Label
+                      htmlFor={`${prefix}_dep_name_${dep.id}`}
+                      className="sr-only"
+                    >
+                      Dependency Name {index + 1}
+                    </Label>
+                    <Input
+                      id={`${prefix}_dep_name_${dep.id}`}
+                      value={dep.name}
+                      onChange={(e) =>
+                        handleDependencyChange(
+                          type,
+                          dep.id,
+                          "name",
+                          e.target.value
+                        )
+                      }
+                      placeholder="Package Name (e.g., react)"
+                      className={
+                        errors[`${prefix}_dep_name_${dep.id}`]
+                          ? "border-red-500"
+                          : ""
+                      }
+                      disabled={isSubmitting}
+                      aria-invalid={!!errors[`${prefix}_dep_name_${dep.id}`]}
+                      aria-describedby={
+                        errors[`${prefix}_dep_name_${dep.id}`]
+                          ? `${prefix}_dep_name_${dep.id}-error`
+                          : undefined
+                      }
+                    />
+                    {errors[`${prefix}_dep_name_${dep.id}`] && (
+                      <p
+                        id={`${prefix}_dep_name_${dep.id}-error`}
+                        className="text-xs text-red-600 mt-1"
                       >
-                        Dependency Name {index + 1}
-                      </Label>
-                      <Input
-                        id={`${type}_dep_name_${dep.id}`}
-                        value={dep.name}
-                        onChange={(e) =>
-                          handleDependencyChange(
-                            type,
-                            dep.id,
-                            "name",
-                            e.target.value
-                          )
-                        }
-                        placeholder="Package Name (e.g., react)"
-                        className={
-                          errors[`${type.slice(0, 2)}_dep_name_${dep.id}`]
-                            ? "border-red-500"
-                            : ""
-                        }
-                        disabled={isSubmitting} // Disable while submitting
-                      />
-                      {errors[`${type.slice(0, 2)}_dep_name_${dep.id}`] && (
-                        <p className="text-xs text-red-500 mt-1">
-                          {errors[`${type.slice(0, 2)}_dep_name_${dep.id}`]}
-                        </p>
-                      )}
-                    </div>
-                    <div className="sm:col-span-5">
-                      <Label
-                        htmlFor={`${type}_dep_version_${dep.id}`}
-                        className="sr-only"
-                      >
-                        Dependency Version {index + 1}
-                      </Label>
-                      <Input
-                        id={`${type}_dep_version_${dep.id}`}
-                        value={dep.version}
-                        onChange={(e) =>
-                          handleDependencyChange(
-                            type,
-                            dep.id,
-                            "version",
-                            e.target.value
-                          )
-                        }
-                        placeholder="Version (e.g., ^18.2.0)"
-                        className={
-                          errors[`${type.slice(0, 2)}_dep_version_${dep.id}`]
-                            ? "border-red-500"
-                            : ""
-                        }
-                        disabled={isSubmitting} // Disable while submitting
-                      />
-                      {errors[`${type.slice(0, 2)}_dep_version_${dep.id}`] && (
-                        <p className="text-xs text-red-500 mt-1">
-                          {errors[`${type.slice(0, 2)}_dep_version_${dep.id}`]}
-                        </p>
-                      )}
-                    </div>
-                    <div className="sm:col-span-2 flex justify-end pt-1 sm:pt-0">
-                      <Button
-                        type="button" // Ensure it doesn't submit the form
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveDependency(type, dep.id)}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                        aria-label={`Remove ${type} Dependency ${index + 1}`}
-                        disabled={isSubmitting} // Disable while submitting
-                      >
-                        <Trash2 size={18} />
-                      </Button>
-                    </div>
+                        {errors[`${prefix}_dep_name_${dep.id}`]}
+                      </p>
+                    )}
                   </div>
-                )
-              )
+                  <div className="sm:col-span-5">
+                    <Label
+                      htmlFor={`${prefix}_dep_version_${dep.id}`}
+                      className="sr-only"
+                    >
+                      Dependency Version {index + 1}
+                    </Label>
+                    <Input
+                      id={`${prefix}_dep_version_${dep.id}`}
+                      value={dep.version}
+                      onChange={(e) =>
+                        handleDependencyChange(
+                          type,
+                          dep.id,
+                          "version",
+                          e.target.value
+                        )
+                      }
+                      placeholder="Version (e.g., ^18.2.0)"
+                      className={
+                        errors[`${prefix}_dep_version_${dep.id}`]
+                          ? "border-red-500"
+                          : ""
+                      }
+                      disabled={isSubmitting}
+                      aria-invalid={!!errors[`${prefix}_dep_version_${dep.id}`]}
+                      aria-describedby={
+                        errors[`${prefix}_dep_version_${dep.id}`]
+                          ? `${prefix}_dep_version_${dep.id}-error`
+                          : undefined
+                      }
+                    />
+                    {errors[`${prefix}_dep_version_${dep.id}`] && (
+                      <p
+                        id={`${prefix}_dep_version_${dep.id}-error`}
+                        className="text-xs text-red-600 mt-1"
+                      >
+                        {errors[`${prefix}_dep_version_${dep.id}`]}
+                      </p>
+                    )}
+                  </div>
+                  <div className="sm:col-span-2 flex justify-end pt-1 sm:pt-0">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleRemoveDependency(type, dep.id)}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                      aria-label={`Remove ${type} Dependency ${index + 1}`}
+                      disabled={isSubmitting}
+                    >
+                      <Trash2 size={18} />
+                    </Button>
+                  </div>
+                </div>
+              ))
             )}
           </CardContent>
         </Card>
@@ -768,48 +976,12 @@ export default function NewProjectPage() {
     );
   };
 
-  // --- Documentation Section Data ---
-  const docIcons = {
-    introContent: <FileText className="h-5 w-5" />,
-    prerequisitesContent: <CheckCircle2 className="h-5 w-5" />,
-    installationContent: <Box className="h-5 w-5" />,
-    frontendConfigContent: <Monitor className="h-5 w-5" />,
-    backendConfigContent: <Server className="h-5 w-5" />,
-    databaseSetupContent: <Database className="h-5 w-5" />,
-    authenticationContent: <Lock className="h-5 w-5" />,
-    faqEntries: <Coffee className="h-5 w-5" />, // Icon for the FAQ section header
-  };
-
-  const docLabels = {
-    introContent: "Introduction",
-    prerequisitesContent: "Prerequisites",
-    installationContent: "Installation",
-    frontendConfigContent: "Frontend Configuration",
-    backendConfigContent: "Backend Configuration",
-    databaseSetupContent: "Database Setup",
-    authenticationContent: "Authentication",
-    // faqEntries is handled separately below
-  };
-
-  // Define which sections support markdown
-  const markdownSupport = {
-    introContent: false,
-    prerequisitesContent: true,
-    installationContent: true,
-    frontendConfigContent: true,
-    backendConfigContent: true,
-    databaseSetupContent: true,
-    authenticationContent: true,
-    // FAQs explicitly do not support markdown in the submission object
-  };
-
   // --- JSX ---
   return (
     <DashboardLayout>
-      <Toaster position="top-right" richColors /> {/* Add Toaster component */}
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
         <div className="container mx-auto px-4 py-8">
-          {/* Header, Progress, Tabs... */}
+          {/* Header, Progress, Tabs */}
           <div className="max-w-5xl mx-auto mb-8">
             <div className="flex items-center gap-3 mb-6">
               <Button
@@ -818,7 +990,7 @@ export default function NewProjectPage() {
                 className="rounded-full"
                 onClick={() => router.push("/dashboard/projects")}
                 aria-label="Back to Projects"
-                disabled={isSubmitting} // Disable navigation while submitting
+                disabled={isSubmitting}
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
@@ -837,7 +1009,6 @@ export default function NewProjectPage() {
               </div>
               <Progress value={(currentStep / 3) * 100} className="h-2" />
             </div>
-            {/* Use onClick on TabsTrigger for navigation only if validation passes */}
             <Tabs value={currentStep.toString()} className="w-full">
               <TabsList className="grid grid-cols-3 mb-8">
                 <TabsTrigger
@@ -846,8 +1017,8 @@ export default function NewProjectPage() {
                   className="data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700"
                   onClick={(e) => {
                     if (currentStep > 1) {
-                      e.preventDefault(); // Prevent default tab switch
-                      setCurrentStep(1); // Navigate if allowed
+                      e.preventDefault();
+                      setCurrentStep(1);
                       window.scrollTo(0, 0);
                     }
                   }}
@@ -858,6 +1029,7 @@ export default function NewProjectPage() {
                       "title",
                       "description",
                       "category",
+                      "otherCategory",
                       "image",
                       "demoUrl",
                     ].includes(k)
@@ -870,7 +1042,6 @@ export default function NewProjectPage() {
                   onClick={(e) => {
                     if (currentStep !== 2) {
                       e.preventDefault();
-                      // Allow navigation to step 2 only if step 1 is valid or coming from step 3
                       if (
                         currentStep === 3 ||
                         runValidationForStep(1).isValid
@@ -878,7 +1049,7 @@ export default function NewProjectPage() {
                         setCurrentStep(2);
                         window.scrollTo(0, 0);
                       } else if (currentStep === 1) {
-                        nextStep(); // Run validation before moving from 1 to 2
+                        nextStep();
                       }
                     }
                   }}
@@ -898,7 +1069,6 @@ export default function NewProjectPage() {
                   onClick={(e) => {
                     if (currentStep !== 3) {
                       e.preventDefault();
-                      // Allow navigation to step 3 only if step 2 is valid
                       if (
                         currentStep < 3 &&
                         runValidationForStep(1).isValid &&
@@ -907,47 +1077,63 @@ export default function NewProjectPage() {
                         setCurrentStep(3);
                         window.scrollTo(0, 0);
                       } else if (currentStep === 2) {
-                        nextStep(); // Run validation before moving from 2 to 3
+                        nextStep();
                       } else if (currentStep === 1) {
-                        // Try to validate step 1 then step 2
-                        const { isValid: step1Valid } = runValidationForStep(1);
-                        if (step1Valid) {
-                          const { isValid: step2Valid } =
-                            runValidationForStep(2);
-                          if (step2Valid) {
-                            setCurrentStep(3);
-                            window.scrollTo(0, 0);
+                        const { isValid: step1Valid, stepErrors: s1Errors } =
+                          runValidationForStep(1);
+                        const { isValid: step2Valid, stepErrors: s2Errors } =
+                          runValidationForStep(2);
+                        const currentFields1 = getCurrentStepFields(1);
+                        const currentFields2 = getCurrentStepFields(2);
+                        const clearedErrors = { ...errors };
+                        currentFields1.forEach((f) => delete clearedErrors[f]);
+                        currentFields2.forEach((f) => {
+                          if (f.includes("*")) {
+                            const prefix = f.split("*")[0];
+                            Object.keys(clearedErrors).forEach((key) => {
+                              if (key.startsWith(prefix))
+                                delete clearedErrors[key];
+                            });
                           } else {
-                            setCurrentStep(2); // Go to step 2 first if invalid
-                            window.scrollTo(0, 0);
+                            delete clearedErrors[f];
                           }
+                        });
+                        setErrors({
+                          ...clearedErrors,
+                          ...s1Errors,
+                          ...s2Errors,
+                        });
+                        if (step1Valid && step2Valid) {
+                          setCurrentStep(3);
+                        } else if (step1Valid) {
+                          setCurrentStep(2);
                         } else {
-                          setCurrentStep(1); // Stay on step 1 if invalid
-                          window.scrollTo(0, 0);
+                          setCurrentStep(1);
                         }
+                        window.scrollTo(0, 0);
                       }
                     }
                   }}
                 >
                   Documentation
                   {Object.keys(errors).some(
-                    (k) => k.includes("Content") || k.startsWith("faq_")
+                    (k) => k.startsWith("doc_") || k.startsWith("faq_")
                   ) && <span className="ml-1 text-red-500">*</span>}
                 </TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
+
+          {/* Form Content */}
           <form
             onSubmit={handleSubmit}
-            noValidate // Prevent browser default validation, rely on custom logic
+            noValidate
             className="max-w-5xl mx-auto"
           >
             <Card className="border-none shadow-lg overflow-hidden">
-              {/* Added overflow-hidden */}
               <CardContent className="p-0">
                 <div className="min-h-[400px]">
-                  {/* Ensure minimum height for content visibility */}
-                  {/* Step 1: Basic Information */}
+                  {/* Step 1 */}
                   {currentStep === 1 && (
                     <div className="p-6 md:p-8 space-y-8 animate-in fade-in duration-300">
                       <div className="border-b pb-4 mb-6">
@@ -995,13 +1181,13 @@ export default function NewProjectPage() {
                               </p>
                             )}
                           </div>
-
                           <div className="space-y-2">
                             <Label
                               htmlFor="category"
                               className="text-sm font-medium"
                             >
-                              Category <span className="text-red-500">*</span>
+                              Category
+                              <span className="text-red-500">*</span>
                             </Label>
                             <Select
                               value={formData.category}
@@ -1009,6 +1195,7 @@ export default function NewProjectPage() {
                                 handleSelectChange("category", value)
                               }
                               disabled={isSubmitting}
+                              name="category"
                             >
                               <SelectTrigger
                                 id="category"
@@ -1025,32 +1212,11 @@ export default function NewProjectPage() {
                                 <SelectValue placeholder="Select a category" />
                               </SelectTrigger>
                               <SelectContent>
-                                {/* Add more relevant categories if needed */}
-                                <SelectItem value="Full Stack App">
-                                  Full Stack App
-                                </SelectItem>
-                                <SelectItem value="Frontend App">
-                                  Frontend App
-                                </SelectItem>
-                                <SelectItem value="Backend API">
-                                  Backend API
-                                </SelectItem>
-                                <SelectItem value="E-commerce">
-                                  E-commerce
-                                </SelectItem>
-                                <SelectItem value="Media Platform">
-                                  Media Platform
-                                </SelectItem>
-                                <SelectItem value="SaaS">SaaS</SelectItem>
-                                <SelectItem value="Portfolio">
-                                  Portfolio
-                                </SelectItem>
-                                <SelectItem value="Blog">Blog</SelectItem>
-                                <SelectItem value="Utility Tool">
-                                  Utility Tool
-                                </SelectItem>
-                                <SelectItem value="Game">Game</SelectItem>
-                                <SelectItem value="Other">Other</SelectItem>
+                                {categoryOptions.map((option) => (
+                                  <SelectItem key={option} value={option}>
+                                    {option}
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                             {errors.category && (
@@ -1062,7 +1228,44 @@ export default function NewProjectPage() {
                               </p>
                             )}
                           </div>
-
+                          {formData.category === "Other" && (
+                            <div className="space-y-2 pl-2 border-l-2 border-emerald-200 animate-in fade-in duration-300">
+                              <Label
+                                htmlFor="otherCategory"
+                                className="text-sm font-medium text-gray-600"
+                              >
+                                Specify Category
+                                <span className="text-red-500">*</span>
+                              </Label>
+                              <Input
+                                id="otherCategory"
+                                name="otherCategory"
+                                value={formData.otherCategory}
+                                onChange={handleOtherCategoryChange}
+                                placeholder="Enter custom category name"
+                                className={
+                                  errors.otherCategory
+                                    ? "border-red-500 focus-visible:ring-red-500"
+                                    : ""
+                                }
+                                aria-invalid={!!errors.otherCategory}
+                                aria-describedby={
+                                  errors.otherCategory
+                                    ? "otherCategory-error"
+                                    : undefined
+                                }
+                                disabled={isSubmitting}
+                              />
+                              {errors.otherCategory && (
+                                <p
+                                  id="otherCategory-error"
+                                  className="text-sm text-red-600"
+                                >
+                                  {errors.otherCategory}
+                                </p>
+                              )}
+                            </div>
+                          )}
                           <div className="space-y-2">
                             <Label
                               htmlFor="description"
@@ -1077,11 +1280,7 @@ export default function NewProjectPage() {
                               value={formData.description}
                               onChange={handleChange}
                               placeholder="Describe your project, its purpose, and key features (min 10 characters)"
-                              className={`min-h-[120px] ${
-                                errors.description
-                                  ? "border-red-500 focus-visible:ring-red-500"
-                                  : ""
-                              }`}
+                              className={`min-h-[120px] ${errors.description ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                               aria-invalid={!!errors.description}
                               aria-describedby={
                                 errors.description
@@ -1099,7 +1298,6 @@ export default function NewProjectPage() {
                               </p>
                             )}
                           </div>
-
                           <div className="space-y-2">
                             <Label
                               htmlFor="demoUrl"
@@ -1112,7 +1310,7 @@ export default function NewProjectPage() {
                               <Input
                                 id="demoUrl"
                                 name="demoUrl"
-                                type="url" // Use type="url" for better semantics/mobile keyboards
+                                type="url"
                                 value={formData.demoUrl}
                                 onChange={handleChange}
                                 placeholder="https://your-demo-site.com"
@@ -1141,32 +1339,43 @@ export default function NewProjectPage() {
                             </p>
                           </div>
                         </div>
-
-                        {/* Right Column - Image Upload */}
                         <div className="space-y-4">
                           <Label className="text-sm font-medium block">
                             Project Image
                           </Label>
                           <div className="border rounded-lg p-4 sm:p-6 bg-slate-50 flex flex-col items-center justify-center space-y-4">
                             <div className="relative w-full aspect-video overflow-hidden rounded-md bg-slate-200 flex items-center justify-center text-slate-500">
-                              {imagePreview || formData.image ? ( // Conditionally render image only if src is valid
+                              {imagePreview ? (
                                 <Image
-                                  // Use imagePreview first for instant feedback, fallback to formData.image
-                                  src={imagePreview || formData.image}
+                                  src={imagePreview}
                                   alt="Project preview"
                                   fill
                                   className="object-cover"
-                                  priority // Load image early if it's important
-                                  // Add onError handler? Maybe revert to placeholder/show error?
-                                  onError={() => {
+                                  priority
+                                  onError={(e) => {
                                     console.warn(
-                                      "Image failed to load:",
-                                      imagePreview || formData.image
+                                      "Image preview failed to load:",
+                                      e.target.src
                                     );
-                                    // Optionally clear preview/formData.image if load fails
-                                    // setImagePreview(null);
-                                    // setFormData(prev => ({...prev, image: null}));
-                                    // setErrors(prev => ({...prev, image: "Preview image failed to load."}))
+                                    setImagePreview(null);
+                                  }}
+                                />
+                              ) : formData.image ? (
+                                <Image
+                                  src={formData.image}
+                                  alt="Project image"
+                                  fill
+                                  className="object-cover"
+                                  priority
+                                  onError={(e) => {
+                                    console.warn(
+                                      "Form data image failed to load:",
+                                      e.target.src
+                                    );
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      image: null,
+                                    }));
                                   }}
                                 />
                               ) : (
@@ -1178,11 +1387,7 @@ export default function NewProjectPage() {
                             <div className="w-full">
                               <Label
                                 htmlFor="image-upload"
-                                className={`cursor-pointer inline-flex items-center justify-center gap-2 w-full py-2 px-4 bg-white border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-emerald-500 transition-colors ${
-                                  isUploadingImage
-                                    ? "opacity-50 cursor-not-allowed"
-                                    : ""
-                                } ${errors.image ? "border-red-500" : ""}`}
+                                className={`cursor-pointer inline-flex items-center justify-center gap-2 w-full py-2 px-4 bg-white border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-emerald-500 transition-colors ${isUploadingImage ? "opacity-50 cursor-not-allowed" : ""} ${errors.image ? "border-red-500" : ""}`}
                                 aria-disabled={isUploadingImage}
                               >
                                 {isUploadingImage ? (
@@ -1192,17 +1397,16 @@ export default function NewProjectPage() {
                                 )}
                                 {isUploadingImage
                                   ? "Uploading..."
-                                  : // Check formData.image as well for existing image
-                                  imagePreview || formData.image
-                                  ? "Change Image"
-                                  : "Upload Image"}
+                                  : imagePreview || formData.image
+                                    ? "Change Image"
+                                    : "Upload Image"}
                               </Label>
                               <input
                                 id="image-upload"
-                                name="imageFile" // Name for the input itself
+                                name="imageFile"
                                 type="file"
-                                className="sr-only" // Hide the default ugly input
-                                accept="image/jpeg, image/png, image/gif, image/svg+xml, image/webp" // Be specific
+                                className="sr-only"
+                                accept="image/jpeg, image/png, image/gif, image/svg+xml, image/webp"
                                 onChange={handleImageChange}
                                 disabled={isUploadingImage || isSubmitting}
                                 aria-describedby={
@@ -1230,7 +1434,8 @@ export default function NewProjectPage() {
                       </div>
                     </div>
                   )}
-                  {/* Step 2: Project Details */}
+
+                  {/* Step 2 */}
                   {currentStep === 2 && (
                     <div className="p-6 md:p-8 space-y-8 animate-in fade-in duration-300">
                       <div className="border-b pb-4 mb-6">
@@ -1300,7 +1505,8 @@ export default function NewProjectPage() {
                       {renderDependencies("backend")}
                     </div>
                   )}
-                  {/* Step 3: Documentation */}
+
+                  {/* Step 3 */}
                   {currentStep === 3 && (
                     <div className="p-6 md:p-8 space-y-8 animate-in fade-in duration-300">
                       <div className="border-b pb-4 mb-6">
@@ -1313,104 +1519,192 @@ export default function NewProjectPage() {
                         </p>
                       </div>
                       {/* Documentation Sections */}
-                      <div className="grid grid-cols-1 gap-6">
-                        {Object.entries(docLabels).map(([key, label]) => (
-                          <div key={key} className="space-y-2">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {/* Added flex-wrap */}
-                              <div className="text-emerald-600 flex-shrink-0">
-                                {docIcons[key]}
+                      <div className="space-y-6">
+                        <h3 className="text-xl font-semibold text-gray-700 mb-0">
+                          Documentation Sections
+                        </h3>
+                        {formData.documentationSections.map(
+                          (section, index) => (
+                            <div
+                              key={section.id}
+                              id={section.id}
+                              className="space-y-4 border rounded-lg p-4 bg-white shadow-sm relative group"
+                            >
+                              {/* Section Header */}
+                              <div className="flex items-center gap-3 justify-between flex-wrap mb-2">
+                                <div className="flex items-center gap-3 flex-grow min-w-[200px]">
+                                  <div className="text-emerald-600 flex-shrink-0">
+                                    {getSectionIcon(section.icon)}
+                                  </div>
+                                  <div className="flex-grow">
+                                    <Label
+                                      htmlFor={`title-${section.id}`}
+                                      className="sr-only"
+                                    >
+                                      Section Title {index + 1}
+                                    </Label>
+                                    <Input
+                                      id={`title-${section.id}`}
+                                      value={section.title}
+                                      onChange={(e) =>
+                                        handleSectionTitleChange(
+                                          section.id,
+                                          e.target.value
+                                        )
+                                      }
+                                      placeholder={`Section ${index + 1} Title`}
+                                      className={`text-base font-medium border-0 border-b rounded-none px-1 focus-visible:ring-0 focus-visible:border-emerald-500 ${errors[`doc_title_${section.id}`] ? "border-red-500" : "border-transparent hover:border-slate-300"}`}
+                                      disabled={isSubmitting}
+                                      aria-invalid={
+                                        !!errors[`doc_title_${section.id}`]
+                                      }
+                                      aria-describedby={
+                                        errors[`doc_title_${section.id}`]
+                                          ? `doc_title_${section.id}-error`
+                                          : undefined
+                                      }
+                                    />
+                                    {errors[`doc_title_${section.id}`] && (
+                                      <p
+                                        id={`doc_title_${section.id}-error`}
+                                        className="text-xs text-red-600 mt-1"
+                                      >
+                                        {errors[`doc_title_${section.id}`]}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                                {/* Markdown Visibility Toggle */}
+                                <div className="flex items-center space-x-2 flex-shrink-0">
+                                  <Label
+                                    htmlFor={`md-switch-${section.id}`}
+                                    className="text-xs text-slate-600 flex items-center gap-1"
+                                    title="Show/Hide Markdown Helper Area"
+                                  >
+                                    <Keyboard size={14} /> Markdown Helper
+                                  </Label>
+                                  <Switch
+                                    id={`md-switch-${section.id}`}
+                                    checked={section.showMarkdown}
+                                    onCheckedChange={(checked) =>
+                                      handleMarkdownVisibilityToggle(
+                                        section.id,
+                                        checked
+                                      )
+                                    }
+                                    disabled={isSubmitting}
+                                    aria-label={`Toggle Markdown helper visibility for ${section.title}`}
+                                  />
+                                </div>
+                                {/* Delete Button */}
+                                {section.isDeletable && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() =>
+                                      handleRemoveSection(section.id)
+                                    }
+                                    className="text-slate-400 hover:text-red-600 hover:bg-red-50 h-7 w-7 absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    aria-label={`Remove Section: ${section.title}`}
+                                    disabled={isSubmitting}
+                                  >
+                                    <Trash2 size={16} />
+                                  </Button>
+                                )}
                               </div>
-                              <Label
-                                htmlFor={key}
-                                className="text-base font-medium"
-                              >
-                                {label}
-                                {/* Optionally add * if validation requires content */}
-                                {/* {isRequired(key) && <span className="text-red-500">*</span>} */}
-                              </Label>
-                              {markdownSupport[key] && (
-                                <div className="flex items-center gap-1">
-                                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded whitespace-nowrap">
-                                    {/* Added whitespace-nowrap */}
-                                    Markdown Supported
-                                  </span>
-                                  <MarkdownGuidePopover />
+
+                              {/* Rich Text Editor (Always Visible) */}
+                              <div className="space-y-1">
+                                <Label
+                                  htmlFor={`content-${section.id}`}
+                                  className="text-sm font-medium"
+                                >
+                                  Content (Rich Text)
+                                </Label>
+                                <RichTextEditor
+                                  id={`content-${section.id}`}
+                                  value={section.content}
+                                  onChange={(value) =>
+                                    handleRichTextChange(section.id, value)
+                                  }
+                                  placeholder={`Enter rich text content for ${section.title}...`}
+                                  className={
+                                    errors[`doc_content_${section.id}`]
+                                      ? "border-red-500"
+                                      : ""
+                                  }
+                                  disabled={isSubmitting}
+                                />
+                                {errors[`doc_content_${section.id}`] && (
+                                  <p
+                                    id={`doc_content_${section.id}-error`}
+                                    className="text-sm text-red-600 mt-1"
+                                  >
+                                    {errors[`doc_content_${section.id}`]}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Markdown Area (Conditionally Visible) */}
+                              {section.showMarkdown && (
+                                <div className="space-y-2 pt-3 border-t border-slate-200 animate-in fade-in duration-300">
+                                  <Label
+                                    htmlFor={`markdown-${section.id}`}
+                                    className="text-sm font-medium flex justify-between items-center text-slate-600"
+                                  >
+                                    <span>Markdown Helper / Input</span>
+                                    <MarkdownGuidePopover />
+                                  </Label>
+                                  <Textarea
+                                    id={`markdown-${section.id}`}
+                                    value={section.markdownContent}
+                                    onChange={(e) =>
+                                      handleMarkdownChange(
+                                        section.id,
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder={`Use helpers below or write Markdown here...`}
+                                    className={`min-h-[150px] font-mono text-xs bg-slate-50`}
+                                    disabled={isSubmitting}
+                                  />
+                                  <MarkdownCodeHelper
+                                    sectionType={section.id} // Pass section ID
+                                    onInsert={(markdown) =>
+                                      handleInsertMarkdown(section.id, markdown)
+                                    }
+                                  />
                                 </div>
                               )}
                             </div>
-                            <Textarea
-                              id={key}
-                              name={key}
-                              value={formData[key]}
-                              onChange={handleChange}
-                              placeholder={`Enter content for ${label}...${
-                                markdownSupport[key]
-                                  ? " Use Markdown for formatting (e.g., # H1, **bold**, `code`, ```block```)."
-                                  : ""
-                              }`}
-                              className={`min-h-[150px] ${
-                                errors[key]
-                                  ? "border-red-500 focus-visible:ring-red-500"
-                                  : ""
-                              }`} // Add error styling if needed
-                              aria-invalid={!!errors[key]}
-                              aria-describedby={
-                                errors[key]
-                                  ? `${key}-error`
-                                  : markdownSupport[key]
-                                  ? `${key}-hint`
-                                  : undefined
-                              }
-                              disabled={isSubmitting}
-                            />
-                            {markdownSupport[key] && (
-                              <div>
-                                <p
-                                  id={`${key}-hint`}
-                                  className="text-xs text-muted-foreground mb-2"
-                                >
-                                  {key === "installationContent" ||
-                                  key === "frontendConfigContent" ||
-                                  key === "backendConfigContent" ||
-                                  key === "databaseSetupContent"
-                                    ? "Use ```bash, ```javascript, ```html etc. for code blocks."
-                                    : "Supports Markdown for rich text formatting."}
-                                </p>
-
-                                {/* Add the code helper component for markdown sections */}
-                                <MarkdownCodeHelper
-                                  onInsert={(codeTemplate) =>
-                                    handleInsertCodeTemplate(key, codeTemplate)
-                                  }
-                                  sectionType={key}
-                                />
-                              </div>
-                            )}
-                            {errors[key] && (
-                              <p
-                                id={`${key}-error`}
-                                className="text-sm text-red-600"
-                              >
-                                {errors[key]}
-                              </p>
-                            )}
-                          </div>
-                        ))}
+                          )
+                        )}
+                        {/* Add New Section Button */}
+                        <div className="pt-4 text-center">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleAddSection}
+                            disabled={isSubmitting}
+                            className="gap-1 border-dashed"
+                          >
+                            <Plus size={16} /> Add Documentation Section
+                          </Button>
+                        </div>
                       </div>
+                      {/* --- End Documentation Sections --- */}
 
-                      {/* FAQ Section */}
+                      {/* --- FAQ Section (Keep as is) --- */}
                       <div className="space-y-2 pt-6 border-t mt-8">
                         <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                           <div className="flex items-center gap-2">
                             <div className="text-emerald-600 flex-shrink-0">
-                              {docIcons.faqEntries}
+                              {sectionIcons.Coffee}
                             </div>
                             <Label className="text-base font-medium">
                               Frequently Asked Questions (FAQ)
                             </Label>
-                            {/* Add * if at least one FAQ is required */}
-                            {/* {isRequired("faq") && <span className="text-red-500">*</span>} */}
                           </div>
                           <Button
                             type="button"
@@ -1429,21 +1723,20 @@ export default function NewProjectPage() {
                           </div>
                         ) : (
                           <Accordion
-                            type="multiple" // Allow multiple items open
-                            className="w-full border rounded-md px-0 mt-2 bg-white divide-y" // Removed px-2, handled by item padding
+                            type="multiple"
+                            className="w-full border rounded-md px-0 mt-2 bg-white divide-y"
                           >
                             {formData.faqEntries.map((faq, index) => (
                               <AccordionItem
                                 value={`item-${faq.id}`}
                                 key={faq.id}
-                                className="border-b-0" // Handled by divide-y
+                                className="border-b-0"
                               >
                                 <AccordionTrigger className="hover:no-underline px-4 py-3 text-left w-full">
                                   <span className="font-medium truncate pr-2 flex-1">
-                                    {/* Added flex-1 */}Q{index + 1}:
+                                    Q{index + 1}:
                                     {faq.question || "(Untitled Question)"}
                                   </span>
-                                  {/* Indicate errors on the trigger */}
                                   {(errors[`faq_q_${faq.id}`] ||
                                     errors[`faq_a_${faq.id}`]) && (
                                     <span className="ml-2 text-red-500 flex-shrink-0">
@@ -1471,11 +1764,7 @@ export default function NewProjectPage() {
                                         )
                                       }
                                       placeholder="Enter the question"
-                                      className={`text-sm ${
-                                        errors[`faq_q_${faq.id}`]
-                                          ? "border-red-500 focus-visible:ring-red-500"
-                                          : ""
-                                      }`}
+                                      className={`text-sm ${errors[`faq_q_${faq.id}`] ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                                       aria-invalid={!!errors[`faq_q_${faq.id}`]}
                                       aria-describedby={
                                         errors[`faq_q_${faq.id}`]
@@ -1512,12 +1801,8 @@ export default function NewProjectPage() {
                                         )
                                       }
                                       placeholder="Enter the answer"
-                                      rows={3} // Reduced rows slightly
-                                      className={`text-sm ${
-                                        errors[`faq_a_${faq.id}`]
-                                          ? "border-red-500 focus-visible:ring-red-500"
-                                          : ""
-                                      }`}
+                                      rows={3}
+                                      className={`text-sm ${errors[`faq_a_${faq.id}`] ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                                       aria-invalid={!!errors[`faq_a_${faq.id}`]}
                                       aria-describedby={
                                         errors[`faq_a_${faq.id}`]
@@ -1555,30 +1840,27 @@ export default function NewProjectPage() {
                           </Accordion>
                         )}
                       </div>
-                      {/* End FAQ Section */}
+                      {/* --- End FAQ Section --- */}
                     </div>
                   )}
                 </div>
-                {/* End min-h div */}
-                {/* Navigation Buttons */}
+
+                {/* --- Navigation Buttons --- */}
                 <div className="flex flex-col sm:flex-row justify-between items-center p-6 md:p-8 bg-slate-50 border-t mt-auto">
-                  {/* Added mt-auto */}
-                  {/* Submit Error Area */}
-                  <div className="mb-4 sm:mb-0">
+                  <div className="mb-4 sm:mb-0 min-h-[20px]">
                     {errors.submit && (
                       <p className="text-sm text-red-600 font-medium">
                         {errors.submit}
                       </p>
                     )}
                   </div>
-                  {/* Button Group */}
                   <div className="flex gap-3">
                     {currentStep > 1 && (
                       <Button
                         type="button"
                         variant="outline"
                         onClick={prevStep}
-                        disabled={isSubmitting} // Disable Previous when submitting
+                        disabled={isSubmitting}
                       >
                         Previous
                       </Button>
@@ -1588,14 +1870,13 @@ export default function NewProjectPage() {
                         type="button"
                         onClick={nextStep}
                         className="bg-emerald-600 hover:bg-emerald-700"
-                        // Disable Next if image is uploading OR if submitting (though submitting shouldn't happen here)
                         disabled={isUploadingImage || isSubmitting}
                         aria-label="Next Step"
                       >
                         {isUploadingImage ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Please wait... {/* Indicate waiting for upload */}
+                            Please wait...
                           </>
                         ) : (
                           "Next"
@@ -1606,7 +1887,6 @@ export default function NewProjectPage() {
                       <Button
                         type="submit"
                         className="bg-emerald-600 hover:bg-emerald-700"
-                        // Disable Submit if actively submitting OR if image is still uploading
                         disabled={isSubmitting || isUploadingImage}
                         aria-label={
                           isSubmitting
@@ -1622,7 +1902,7 @@ export default function NewProjectPage() {
                         ) : isUploadingImage ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Uploading Image... {/* More specific message */}
+                            Uploading Image...
                           </>
                         ) : (
                           "Create Project"
@@ -1631,64 +1911,67 @@ export default function NewProjectPage() {
                     )}
                   </div>
                 </div>
-                {/* End Navigation Buttons Div */}
               </CardContent>
             </Card>
           </form>
-          {/* Helpful Tips */}
+
+          {/* --- Helpful Tips --- */}
           <div className="max-w-5xl mx-auto mt-8">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h3 className="text-sm font-semibold text-blue-800 mb-2 flex items-center gap-2">
-                <Info size={16} className="text-blue-700" />
-                Markdown Code Tips
+                <Info size={16} className="text-blue-700" /> Editor Tips
               </h3>
               <ul className="text-sm text-blue-700 space-y-1.5 ml-5 list-disc marker:text-blue-400">
                 <li>
-                  Use <code className="bg-blue-100 px-1 rounded">```bash</code>
-                  for terminal commands and shell scripts
+                  The Rich Text Editor is the primary content area. Use its
+                  toolbar for formatting, links, images (
+                  <ImageIcon
+                    size={14}
+                    className="inline align-text-bottom mx-0.5"
+                  />
+                  ), videos (
+                  <Video
+                    size={14}
+                    className="inline align-text-bottom mx-0.5"
+                  />
+                  ), and code blocks (
+                  <CodeIcon
+                    size={14}
+                    className="inline align-text-bottom mx-0.5"
+                  />
+                  ).
                 </li>
                 <li>
-                  Use
-                  <code className="bg-blue-100 px-1 rounded">
-                    ```javascript
-                  </code>
-                  for JavaScript code
+                  Optionally, toggle the &quot;Markdown Helper&quot; (
+                  <Keyboard
+                    size={14}
+                    className="inline align-text-bottom mx-0.5"
+                  />
+                  ) switch for each section to show a Markdown input area below.
                 </li>
                 <li>
-                  Use
-                  <code className="bg-blue-100 px-1 rounded">
-                    ```typescript
-                  </code>
-                  for TypeScript code
+                  Use the Markdown helpers (
+                  <CodeIcon
+                    size={14}
+                    className="inline align-text-bottom mx-0.5"
+                  />
+                  <HelpCircle
+                    size={14}
+                    className="inline align-text-bottom mx-0.5"
+                  />
+                  ) to generate Markdown snippets (like code blocks) in the
+                  helper area. You can then copy/paste this into the Rich Text
+                  Editor above if needed.
                 </li>
                 <li>
-                  Use <code className="bg-blue-100 px-1 rounded">```html</code>
-                  for HTML markup
-                </li>
-                <li>
-                  Use <code className="bg-blue-100 px-1 rounded">```css</code>
-                  for CSS styles
-                </li>
-                <li>
-                  Use <code className="bg-blue-100 px-1 rounded">```json</code>
-                  for JSON configuration files
-                </li>
-                <li>
-                  Use <code className="bg-blue-100 px-1 rounded">```sql</code>
-                  for database queries
-                </li>
-                <li>
-                  Click the &quot;Insert Code Block&quot; helper below each
-                  markdown-enabled section to quickly add formatted code
+                  Content saved upon submission comes directly from the Rich
+                  Text Editor.
                 </li>
               </ul>
             </div>
           </div>
-          {/* End Helpful Tips Div */}
         </div>
-        {/* End Container Div */}
       </div>
-      {/* End Background Div */}
     </DashboardLayout>
   );
 }

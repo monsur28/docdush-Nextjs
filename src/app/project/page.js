@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/footer";
+import Footer from "@/components/Footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,7 +88,6 @@ export default function ProjectsListPage() {
         setProjects(fetchedProjects);
         setFilteredProjects(fetchedProjects);
       } catch (err) {
-        console.error("Error fetching projects:", err);
         const errorMsg =
           err.response?.data?.message ||
           err.message ||

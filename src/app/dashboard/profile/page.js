@@ -3,7 +3,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import axios from "axios";
 import {
   updateProfile,
   updatePassword,
@@ -32,6 +31,7 @@ import { useAuth } from "@/context/auth-context";
 
 // --- Use sonner toast ---
 import { toast } from "sonner";
+import axiosSecure from "@/lib/axiosSecure";
 
 // ImgBB Key
 const imgbbApiKey = process.env.NEXT_PUBLIC_IMGBB_API_KEY;
@@ -156,14 +156,13 @@ export default function ProfilePage() {
 
     try {
       if (!imgbbApiKey) throw new Error("ImgBB API Key not configured");
-      const response = await axios.post(
+      const response = await axiosSecure.post(
         `https://api.imgbb.com/1/upload?key=${imgbbApiKey}`,
         uploadFormData
       );
 
       if (response.data && response.data.success) {
         const uploadedUrl = response.data.data.url;
-        console.log("ImgBB URL:", uploadedUrl);
 
         await updateUserProfile({ photoURL: uploadedUrl });
         setAvatarPreview(uploadedUrl);
@@ -216,7 +215,6 @@ export default function ProfilePage() {
     try {
       await updateProfile(auth.currentUser, dataToUpdate);
       // Removed duplicate success toast here - it's handled in calling functions
-      console.log("Firebase profile updated:", dataToUpdate);
     } catch (error) {
       console.error("Firebase profile update error:", error);
       throw error; // Re-throw to be handled by calling function

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Menu, X } from "lucide-react";
@@ -8,11 +8,10 @@ import { usePathname } from "next/navigation";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [siteImage, setSiteImage] = useState(null);
   const pathname = usePathname();
 
-  const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
-  };
+  const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
   const navLinks = [
     { name: "Home", href: "/" },
@@ -20,6 +19,28 @@ const Navbar = () => {
     { name: "About", href: "/about" },
     { name: "Contact", href: "/contact" },
   ];
+
+  useEffect(() => {
+    const fetchSiteInfo = async () => {
+      try {
+        const res = await fetch("/api/site-info");
+        const data = await res.json();
+        if (data.success && data.data.siteImage) {
+          setSiteImage(data.data.siteImage);
+        } else {
+          setSiteImage(null);
+        }
+      } catch (error) {
+        console.error("Failed to fetch site info:", error);
+        setSiteImage(null);
+      }
+    };
+
+    fetchSiteInfo();
+  }, []);
+
+  const fallbackImage =
+    "https://i.ibb.co/dqGXxqn/Doc-Dush-twintech-removebg-preview.png";
 
   return (
     <header className="sticky top-0 z-50 bg-white text-gray-800 shadow-md">
@@ -31,7 +52,7 @@ const Navbar = () => {
               <div className="absolute -inset-1 bg-gradient-to-r from-[#82b440] to-[#5a8e30] rounded-full opacity-0 group-hover:opacity-70 transition duration-300 group-hover:duration-200 animate-pulse blur-md"></div>
               <div className="relative">
                 <Image
-                  src="https://i.ibb.co/dqGXxqn/Doc-Dush-twintech-removebg-preview.png"
+                  src={siteImage || fallbackImage}
                   alt="Logo"
                   className="w-16 h-16 rounded-full object-contain transition-transform duration-300 group-hover:scale-110"
                   width={100}

@@ -1,7 +1,5 @@
-// Example path: src/app/project/[id]/page.jsx (Ensure file path matches your routing)
 "use client";
 
-// Add 'use' back to the import
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -13,27 +11,33 @@ import {
   Box,
   Server,
   Database,
-  Code,
   Settings,
   AlertCircle,
   Monitor,
   ExternalLink,
-  Download,
   Lock,
   CheckCircle2,
   Coffee,
   Loader2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar"; // Adjust path if needed
-import Footer from "@/components/footer"; // Adjust path if needed
+import Footer from "@/components/Footer"; // Adjust path if needed
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-// --- Markdown / Syntax Highlighting Imports ---
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import React from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { coldarkDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
+// HTML Sanitization function to prevent XSS
+const sanitizeHtml = (html) => {
+  // In a production environment, you should use a proper HTML sanitizer like DOMPurify
+  // This is a very basic implementation for demonstration purposes
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/on\w+="[^"]*"/g, "");
+};
 
 // --- Icon Mapping ---
 const iconMap = {
@@ -115,6 +119,48 @@ const markdownComponents = {
         </code>
       );
     }
+  },
+  img({ node, ...props }) {
+    return (
+      <div className="my-6">
+        <Image
+          className="rounded-md max-w-full h-auto"
+          {...props}
+          loading="lazy"
+          alt={props.alt || "Documentation image"}
+        />
+        {props.alt && (
+          <p className="text-sm text-center text-gray-500 mt-2">{props.alt}</p>
+        )}
+      </div>
+    );
+  },
+  p({ node, children, ...props }) {
+    // Check if paragraph contains a YouTube embed marker
+    const childrenArray = React.Children.toArray(children);
+    const youtubeMatch =
+      typeof childrenArray[0] === "string" &&
+      childrenArray[0].match(/\[youtube:([a-zA-Z0-9_-]{11})\]/);
+
+    if (youtubeMatch) {
+      const videoId = youtubeMatch[1];
+      return (
+        <div className="my-6">
+          <div className="relative pb-[56.25%] h-0 overflow-hidden rounded-lg shadow-md">
+            <iframe
+              src={`https://www.youtube.com/embed/${videoId}`}
+              className="absolute top-0 left-0 w-full h-full"
+              title="YouTube video player"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        </div>
+      );
+    }
+
+    return <p {...props}>{children}</p>;
   },
 };
 // --- End Custom Renderers ---
@@ -318,7 +364,7 @@ export default function ProjectPage({ params }) {
             <div className="aspect-[16/6] bg-gradient-to-r from-[#0b1622] to-[#1c2a3a] relative">
               {projectData.image && (
                 <Image
-                  src={projectData.image}
+                  src={projectData.image || "/placeholder.svg"}
                   alt={projectData.title || "Project Image"}
                   fill
                   className="object-cover mix-blend-overlay opacity-40"
@@ -432,8 +478,8 @@ export default function ProjectPage({ params }) {
                     {frontendDeps.length > 0 && (
                       <div>
                         <h4 className="text-sm font-medium flex items-center mb-2 text-gray-700">
-                          <Monitor className="h-4 w-4 mr-2 text-blue-500 flex-shrink-0" />{" "}
-                          Frontend{" "}
+                          <Monitor className="h-4 w-4 mr-2 text-blue-500 flex-shrink-0" />
+                          Frontend
                         </h4>
                         <div className="max-h-48 overflow-y-auto space-y-1 pr-1 text-xs border-l-2 border-blue-100 pl-3 scrollbar">
                           {frontendDeps.map((pkg, idx) => (
@@ -446,13 +492,13 @@ export default function ProjectPage({ params }) {
                                 title={pkg.name}
                               >
                                 {pkg.name || "N/A"}
-                              </span>{" "}
+                              </span>
                               <Badge
                                 variant="secondary"
                                 className="text-blue-700 bg-blue-50 font-mono text-xs"
                               >
                                 {pkg.version || "N/A"}
-                              </Badge>{" "}
+                              </Badge>
                             </div>
                           ))}
                         </div>
@@ -461,8 +507,8 @@ export default function ProjectPage({ params }) {
                     {backendDeps.length > 0 && (
                       <div>
                         <h4 className="text-sm font-medium flex items-center mb-2 text-gray-700">
-                          <Server className="h-4 w-4 mr-2 text-purple-500 flex-shrink-0" />{" "}
-                          Backend{" "}
+                          <Server className="h-4 w-4 mr-2 text-purple-500 flex-shrink-0" />
+                          Backend
                         </h4>
                         <div className="max-h-48 overflow-y-auto space-y-1 pr-1 text-xs border-l-2 border-purple-100 pl-3 scrollbar">
                           {backendDeps.map((pkg, idx) => (
@@ -475,13 +521,13 @@ export default function ProjectPage({ params }) {
                                 title={pkg.name}
                               >
                                 {pkg.name || "N/A"}
-                              </span>{" "}
+                              </span>
                               <Badge
                                 variant="secondary"
                                 className="text-purple-700 bg-purple-50 font-mono text-xs"
                               >
                                 {pkg.version || "N/A"}
-                              </Badge>{" "}
+                              </Badge>
                             </div>
                           ))}
                         </div>
@@ -510,22 +556,29 @@ export default function ProjectPage({ params }) {
                   >
                     <div className="flex items-center mb-6 pb-3 border-b border-gray-200">
                       <div className="w-10 h-10 flex items-center justify-center bg-gray-100 rounded-lg mr-4 flex-shrink-0">
-                        {" "}
-                        {getIcon(section.icon)}{" "}
+                        {getIcon(section.icon)}
                       </div>
                       <h2 className="text-2xl font-semibold text-gray-900 m-0 p-0 border-none">
                         {section.title || "Untitled Section"}
                       </h2>
                     </div>
-                    {/* HYDRATION ERROR REMINDER - Fix source Markdown */}
+
                     <div className="prose prose-slate max-w-none prose-p:text-gray-700 prose-li:text-gray-600 prose-a:text-blue-600 hover:prose-a:text-blue-800 prose-headings:font-semibold prose-pre:bg-slate-800 prose-pre:text-slate-200 prose-pre:scrollbar prose-code:before:content-none prose-code:after:content-none">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        components={markdownComponents}
-                      >
-                        {section.content ||
-                          "*No content provided for this section.*"}
-                      </ReactMarkdown>
+                      {/* Check if content appears to be HTML (contains HTML tags) */}
+                      {section.content &&
+                      section.content.match(/<[a-z][\s\S]*>/i) ? (
+                        <div
+                          dangerouslySetInnerHTML={{ __html: section.content }}
+                        />
+                      ) : (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={markdownComponents}
+                        >
+                          {section.content ||
+                            "*No content provided for this section.*"}
+                        </ReactMarkdown>
+                      )}
                     </div>
                   </section>
                 ))

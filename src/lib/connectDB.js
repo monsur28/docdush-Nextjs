@@ -32,10 +32,6 @@ const connectDB = async () => {
     // Wait for MongoClient to connect and select the database
     const client = await clientPromise;
     db = client.db("dbdoctwintech");
-
-    // Log a successful connection to the terminal
-    console.log("MongoDB connected successfully to database:");
-
     return db;
   } catch (error) {
     console.error("Failed to connect to MongoDB:", error);

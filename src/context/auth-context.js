@@ -6,6 +6,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
+  getAuth,
+  getIdToken,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
@@ -15,12 +17,26 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [jwtToken, setJwtToken] = useState(null); // State for storing JWT
 
   useEffect(() => {
     if (!auth) return;
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
+      if (user) {
+        try {
+          // Get JWT token on user login
+          const token = await getIdToken(user);
+          setJwtToken(token);
+          localStorage.setItem("jwtToken", token); // Store JWT token in localStorage
+        } catch (err) {
+          console.error("Error fetching JWT token:", err);
+        }
+      } else {
+        setJwtToken(null);
+        localStorage.removeItem("jwtToken"); // Remove JWT token on logout
+      }
       setLoading(false);
     });
 
@@ -30,7 +46,15 @@ export function AuthProvider({ children }) {
   const signIn = async (email, password) => {
     setError(null);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const user = userCredential.user;
+      const token = await getIdToken(user);
+      setJwtToken(token);
+      localStorage.setItem("jwtToken", token); // Store JWT token
     } catch (error) {
       setError(handleFirebaseError(error));
       throw error;
@@ -40,7 +64,15 @@ export function AuthProvider({ children }) {
   const signUp = async (email, password) => {
     setError(null);
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const user = userCredential.user;
+      const token = await getIdToken(user);
+      setJwtToken(token);
+      localStorage.setItem("jwtToken", token); // Store JWT token
     } catch (error) {
       setError(handleFirebaseError(error));
       throw error;
@@ -51,6 +83,8 @@ export function AuthProvider({ children }) {
     setError(null);
     try {
       await firebaseSignOut(auth);
+      setJwtToken(null);
+      localStorage.removeItem("jwtToken"); // Remove JWT token on logout
     } catch (error) {
       setError(handleFirebaseError(error));
       throw error;
@@ -59,7 +93,15 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, signIn, signUp, signOut, error }}
+      value={{
+        user,
+        loading,
+        signIn,
+        signUp,
+        signOut,
+        error,
+        jwtToken, // Provide JWT token
+      }}
     >
       {children}
     </AuthContext.Provider>

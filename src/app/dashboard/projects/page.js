@@ -4,7 +4,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import axios from "axios";
 import Image from "next/image";
 import { Edit2, Eye, Trash2, Loader2, Plus, Star, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import axiosSecure from "@/lib/axiosSecure";
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -40,7 +40,7 @@ export default function ProjectsPage() {
     /* ... */
     try {
       setIsLoading(true);
-      const response = await axios.get("/api/projects");
+      const response = await axiosSecure.get("/api/projects");
       const projectsWithFeatured = response.data.map((project) => ({
         ...project,
         featured: project.featured !== undefined ? project.featured : false,
@@ -84,7 +84,9 @@ export default function ProjectsPage() {
     }
 
     try {
-      await axios.patch(`/api/projects/${id}`, { featured: newFeaturedState });
+      await axiosSecure.patch(`/api/projects/${id}`, {
+        featured: newFeaturedState,
+      });
       if (newFeaturedState) {
         toast.success("Project featured", {
           description: "The project has been marked as featured.",
@@ -121,7 +123,7 @@ export default function ProjectsPage() {
     const { _id, title } = projectToDelete;
     setDeletingId(_id);
     try {
-      const response = await axios.delete(`/api/projects/${_id}`);
+      const response = await axiosSecure.delete(`/api/projects/${_id}`);
       if (response.status === 200 && response.data?.success) {
         setProjects((currentProjects) =>
           currentProjects.filter((p) => p._id !== _id)

@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import axios from "axios"; // Import axios or use fetch
 import { Loader2 } from "lucide-react"; // Assuming you have lucide-react
 
 // Remove mock data imports
@@ -13,6 +12,7 @@ import DashboardCard from "@/components/DashboardCard";
 import RecentActivity from "@/components/RecentActivity";
 import DashboardLayout from "@/components/DashboardLayout";
 import Link from "next/link"; // Use Next.js Link for internal navigation
+import axiosSecure from "@/lib/axiosSecure";
 
 export default function DashboardPage() {
   // State for fetched data
@@ -30,8 +30,8 @@ export default function DashboardPage() {
       try {
         // Fetch stats and activity concurrently
         const [statsResponse, activityResponse] = await Promise.all([
-          axios.get("/api/stats"),
-          axios.get("/api/activity?limit=5"), // Fetch latest 5 activities
+          axiosSecure.get("/api/stats"),
+          axiosSecure.get("/api/activity?limit=5"), // Fetch latest 5 activities
         ]);
         // --- Process Stats Response ---
         // Adjust checks based on your actual API response structure

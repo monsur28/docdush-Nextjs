@@ -58,12 +58,6 @@ const Head = () => {
     };
   }, []);
 
-  const notifications = [
-    { id: 1, text: "Your order #1234 has been shipped.", time: "2h ago" },
-    { id: 2, text: "New user registered on your platform.", time: "5h ago" },
-    { id: 3, text: "Server downtime scheduled for tonight.", time: "1d ago" },
-  ];
-
   return (
     <header className="px-4 sm:px-6 py-4 z-10 top-0">
       <div className="flex items-center justify-between">
