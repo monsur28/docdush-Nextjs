@@ -181,84 +181,80 @@ export default function SecureTicketView({ ticket, token }) {
 
   // Render Message Content (Corrected field names)
   const renderMessageContent = (message) => {
-    try {
-      const parsedContent = JSON.parse(message.content);
-      return (
-        <div>
-          {/* Render text content */}
-          {parsedContent.text && (
-            <p className="mb-2 whitespace-pre-wrap break-words">
-              {parsedContent.text}
-            </p>
-          )}
+    // 1. Standardize the data into a consistent 'content' object
+    let content = {
+      text: "",
+      attachments: [],
+    };
 
-          {/* Render attachments */}
-          {parsedContent.attachments &&
-            parsedContent.attachments.length > 0 && (
-              <div className="mt-2 space-y-2">
-                {parsedContent.attachments.map((attachment, index) => {
-                  // *** Corrected Check: Use resource_type ***
-                  const isImage = attachment.resource_type === "image";
-
-                  return (
-                    <div
-                      key={index}
-                      className="border rounded p-2 bg-gray-100 dark:bg-gray-700"
-                    >
-                      {" "}
-                      {/* Adjusted bg color */}
-                      {isImage ? (
-                        // Display image using next/image
-                        <a
-                          href={attachment.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title={attachment.original_filename || "View Image"}
-                        >
-                          <Image
-                            src={attachment.url || "/placeholder.svg"}
-                            // *** Corrected Alt Text: Use original_filename ***
-                            alt={
-                              attachment.original_filename || "Image Attachment"
-                            }
-                            width={300} // Adjust dimensions as needed
-                            height={200}
-                            className="max-h-48 w-auto rounded object-contain hover:opacity-90 transition-opacity" // Adjusted max height and added hover effect
-                          />
-                          {/* Optional: Display filename below image */}
-                          {/* <p className="text-xs text-muted-foreground mt-1 truncate">{attachment.original_filename}</p> */}
-                        </a>
-                      ) : (
-                        // Display link for non-image files
-                        <a
-                          href={attachment.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center text-blue-600 hover:underline"
-                          title={`Download ${attachment.original_filename || "attachment"}`} // Add title attribute
-                        >
-                          <Paperclip className="h-4 w-4 mr-1 flex-shrink-0" />
-                          {/* *** Corrected Link Text: Use original_filename *** */}
-                          <span className="truncate">
-                            {" "}
-                            {/* Add truncate for long names */}
-                            {attachment.original_filename || "Attachment"}
-                          </span>
-                        </a>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-        </div>
-      );
-    } catch (e) {
-      // Fallback for non-JSON content
-      return (
-        <p className="whitespace-pre-wrap break-words">{message.content}</p>
-      );
+    // Check for the first data structure (top-level attachments)
+    if (message.attachments && Array.isArray(message.attachments)) {
+      content.text = message.content;
+      content.attachments = message.attachments;
     }
+    // Else, try to parse the content as JSON for the second structure
+    else {
+      try {
+        const parsedContent = JSON.parse(message.content);
+        content.text = parsedContent.text || "";
+        content.attachments = parsedContent.attachments || [];
+      } catch (e) {
+        // If parsing fails, it's just a plain text message
+        content.text = message.content;
+      }
+    }
+
+    // 2. Now, render the standardized 'content' object
+    return (
+      <div>
+        {content.text && <p className="mb-2">{content.text}</p>}
+
+        {content.attachments && content.attachments.length > 0 && (
+          <div className="mt-2 space-y-2">
+            {content.attachments.map((attachment, index) => {
+              // The filename might be in 'originalFilename' or 'filename'
+              const filename =
+                attachment.originalFilename ||
+                attachment.filename ||
+                "Attachment";
+              const isImage =
+                attachment.resourceType === "image" ||
+                attachment.resource_type === "image";
+
+              return (
+                <div key={index} className="border rounded p-2 bg-slate-50">
+                  {isImage ? (
+                    <a
+                      href={attachment.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Image
+                        src={attachment.url || "/placeholder.svg"}
+                        alt={filename}
+                        width={300}
+                        height={200}
+                        className="max-h-40 max-w-full rounded object-contain"
+                      />
+                    </a>
+                  ) : (
+                    <a
+                      href={attachment.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center text-blue-600 hover:underline"
+                    >
+                      <Paperclip className="h-4 w-4 mr-1" />
+                      {filename}
+                    </a>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
   };
 
   // --- Main Return JSX ---

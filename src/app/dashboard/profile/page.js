@@ -123,18 +123,24 @@ export default function ProfilePage() {
     }
   };
 
+  // src/app/dashboard/profile/page.jsx
+
   const handleImageChange = async (e) => {
     const file = e.target.files?.[0];
     const currentAvatar =
       user?.photoURL || "/placeholder.svg?height=200&width=200";
+
+    // Clear any previous image errors
     setErrors((prev) => {
       const ne = { ...prev };
       delete ne.image;
       return ne;
     });
+
+    // --- Client-side validation (this part stays the same) ---
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
-      setErrors((prev) => ({ ...prev, image: "Image < 2MB" }));
+      setErrors((prev) => ({ ...prev, image: "Image must be under 2MB." }));
       return;
     }
     if (
@@ -142,48 +148,51 @@ export default function ProfilePage() {
         file.type
       )
     ) {
-      setErrors((prev) => ({ ...prev, image: "Invalid type" }));
+      setErrors((prev) => ({ ...prev, image: "Invalid file type." }));
       return;
     }
 
     setIsUploadingImage(true);
+
+    // Show a local preview immediately
     const reader = new FileReader();
     reader.onloadend = () => setAvatarPreview(reader.result.toString());
     reader.readAsDataURL(file);
 
+    // Prepare form data to send to YOUR API
     const uploadFormData = new FormData();
     uploadFormData.append("image", file);
 
     try {
-      if (!imgbbApiKey) throw new Error("ImgBB API Key not configured");
-      const response = await axiosSecure.post(
-        `https://api.imgbb.com/1/upload?key=${imgbbApiKey}`,
-        uploadFormData
-      );
+      // ✅ NEW: Call your own backend API route
+      const response = await axiosSecure.post("/api/upload", uploadFormData);
 
-      if (response.data && response.data.success) {
-        const uploadedUrl = response.data.data.url;
+      // ✅ NEW: Your API returns a simpler object: { url: "..." }
+      if (response.data && response.data.url) {
+        const uploadedUrl = response.data.url;
+        console.log("Image URL from our API:", uploadedUrl);
 
+        // Update the user's profile in Firebase
         await updateUserProfile({ photoURL: uploadedUrl });
-        setAvatarPreview(uploadedUrl);
-        // --- Use sonner toast for success ---
+        setAvatarPreview(uploadedUrl); // Ensure final URL is set
         toast.success("Profile picture updated!");
       } else {
-        throw new Error(response.data?.error?.message || "ImgBB API error");
+        // Handle cases where your API returns an error
+        throw new Error(
+          response.data?.error || "Upload failed. Please try again."
+        );
       }
     } catch (error) {
       console.error("Image upload/update failed:", error);
       setErrors((prev) => ({ ...prev, image: "Upload failed." }));
-      // --- Use sonner toast for error ---
       toast.error("Upload Failed", {
         description: error.message || "Could not upload profile picture.",
       });
-      setAvatarPreview(currentAvatar);
+      setAvatarPreview(currentAvatar); // Revert to the old avatar on failure
     } finally {
       setIsUploadingImage(false);
     }
   };
-
   const handleRemovePicture = async () => {
     const defaultAvatar = "/placeholder.svg?height=200&width=200";
     setIsUploadingImage(true);
@@ -214,7 +223,6 @@ export default function ProfilePage() {
     }
     try {
       await updateProfile(auth.currentUser, dataToUpdate);
-      // Removed duplicate success toast here - it's handled in calling functions
     } catch (error) {
       console.error("Firebase profile update error:", error);
       throw error; // Re-throw to be handled by calling function
@@ -430,11 +438,6 @@ export default function ProfilePage() {
                     {user.displayName || "Name Not Set"}
                   </h3>
                   <p className="text-sm text-muted-foreground">{user.email}</p>
-                  {user.emailVerified === false && (
-                    <Badge variant="destructive" className="mt-1">
-                      Email not verified
-                    </Badge>
-                  )}
                 </div>
                 <div className="w-full">
                   <Button
@@ -649,7 +652,7 @@ export default function ProfilePage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {/* <ul className="space-y-3 text-sm text-muted-foreground">
+                    <ul className="space-y-3 text-sm text-muted-foreground">
                       <li>
                         <span className="font-medium text-foreground">
                           Account Created:
@@ -670,7 +673,7 @@ export default function ProfilePage() {
                             ).toLocaleString()
                           : "N/A"}
                       </li>
-                    </ul> */}
+                    </ul>
                   </CardContent>
                 </Card>
               </TabsContent>

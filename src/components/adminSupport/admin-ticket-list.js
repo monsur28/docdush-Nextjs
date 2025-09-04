@@ -1,16 +1,19 @@
-"use client"
+"use client";
 
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
-import { format } from "date-fns"
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { format } from "date-fns";
 
 export default function AdminTicketList({ tickets, onSelectTicket }) {
+  console.log("Rendering AdminTicketList with tickets:", tickets);
   if (tickets.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-muted-foreground">No tickets found in this category.</p>
+        <p className="text-muted-foreground">
+          No tickets found in this category.
+        </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -33,10 +36,14 @@ export default function AdminTicketList({ tickets, onSelectTicket }) {
               <div>
                 <h3 className="font-medium">{ticket.title}</h3>
                 <p className="text-sm text-muted-foreground">
-                  From: {ticket.userName} ({ticket.email})
+                  From: {ticket.userName} ({ticket.userEmail})
                 </p>
-                <p className="text-sm text-muted-foreground">Project: {ticket.projectName}</p>
-                <p className="text-sm text-muted-foreground">Created: {format(new Date(ticket.createdAt), "PPP")}</p>
+                <p className="text-sm text-muted-foreground">
+                  Project: {ticket.projectName}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Created: {format(new Date(ticket.createdAt), "PPP")}
+                </p>
               </div>
               <Badge
                 className={
@@ -49,18 +56,24 @@ export default function AdminTicketList({ tickets, onSelectTicket }) {
               >
                 {ticket.status === "in-progress"
                   ? "In Progress"
-                  : ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
+                  : ticket.status.charAt(0).toUpperCase() +
+                    ticket.status.slice(1)}
               </Badge>
             </div>
             <div className="mt-2 text-sm">
               <p className="text-muted-foreground truncate">
-                {ticket.messages?.[ticket.messages.length - 1]?.content?.substring(0, 100)}
-                {ticket.messages?.[ticket.messages.length - 1]?.content?.length > 100 ? "..." : ""}
+                {ticket.messages?.[
+                  ticket.messages.length - 1
+                ]?.content?.substring(0, 100)}
+                {ticket.messages?.[ticket.messages.length - 1]?.content
+                  ?.length > 100
+                  ? "..."
+                  : ""}
               </p>
             </div>
           </CardContent>
         </Card>
       ))}
     </div>
-  )
+  );
 }

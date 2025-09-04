@@ -4,7 +4,7 @@ import { verifyToken } from "@/lib/verifyToken";
 
 export async function POST(req) {
   try {
-    // 1. Verify Token
+    // 1. Verify user token (good practice)
     const decodedToken = await verifyToken(req);
     if (!decodedToken) {
       return NextResponse.json(
@@ -12,31 +12,46 @@ export async function POST(req) {
         { status: 401 }
       );
     }
+
+    // 2. Get the image from the incoming request
     const formData = await req.formData();
     const image = formData.get("image");
 
-    const imgbbForm = new FormData();
-    imgbbForm.append("image", image);
+    if (!image) {
+      return NextResponse.json(
+        { success: false, message: "No image file found in the request." },
+        { status: 400 }
+      );
+    }
 
-    const res = await axios.post(
+    // 3. Create a new FormData for the ImgBB request
+    const imgbbFormData = new FormData();
+    imgbbFormData.append("image", image);
+
+    // 4. Make the POST request to ImgBB
+    // Axios will automatically set the correct 'Content-Type: multipart/form-data' header.
+    const response = await axios.post(
       `https://api.imgbb.com/1/upload?key=${process.env.NEXT_PUBLIC_IMGBB_API_KEY}`,
-      imgbbForm,
-      {
-        headers: imgbbForm.getHeaders?.() || {}, // Optional chaining fallback
-      }
+      imgbbFormData
     );
 
-    const imageUrl = res.data?.data?.url;
-
+    // 5. Check the response and return the URL
+    const imageUrl = response.data?.data?.url;
     if (!imageUrl) {
-      throw new Error("Image upload API did not return a valid URL.");
+      console.error("ImgBB API Error:", response.data);
+      throw new Error("Image upload failed to return a valid URL.");
     }
 
     return NextResponse.json({ url: imageUrl }, { status: 200 });
   } catch (error) {
-    console.error("Upload error:", error.message);
+    // Log the detailed error for debugging
+    console.error(
+      "Upload error:",
+      error.response ? error.response.data : error.message
+    );
+
     return NextResponse.json(
-      { error: error.message || "Failed to upload image" },
+      { error: "Failed to upload image. Please try again later." },
       { status: 500 }
     );
   }

@@ -170,93 +170,80 @@ export default function AdminConversationView({
 
   // --- Rendering Logic ---
   const renderMessageContent = (message) => {
-    // (Keep the improved renderMessageContent function from previous examples
-    // which handles JSON parsing and image display)
-    try {
-      let parsedContent;
-      if (typeof message.content === "object" && message.content !== null)
-        parsedContent = message.content;
-      else if (typeof message.content === "string")
-        parsedContent = JSON.parse(message.content);
-      else return <p>{String(message.content)}</p>;
+    // 1. Standardize the data into a consistent 'content' object
+    let content = {
+      text: "",
+      attachments: [],
+    };
 
-      const textContent = parsedContent?.text || "";
-      const attachments = parsedContent?.attachments || [];
-      return (
-        <div>
-          {textContent && (
-            <p className="mb-2 whitespace-pre-wrap break-words">
-              {textContent}
-            </p>
-          )}
-          {attachments.length > 0 && (
-            <div className="mt-2 space-y-2">
-              {attachments.map((attachment, index) => {
-                const isImage = attachment.resource_type === "image";
-                const fileName =
-                  attachment.original_filename ||
-                  attachment.filename ||
-                  "Attachment";
-                const fileSize = attachment.bytes
-                  ? `(${(attachment.bytes / 1024).toFixed(1)} KB)`
-                  : "";
-                return (
-                  <div
-                    key={attachment.public_id || index}
-                    className="border rounded p-2 bg-slate-100 dark:bg-slate-700 max-w-xs"
-                  >
-                    {isImage ? (
-                      <a
-                        href={attachment.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={`View image: ${fileName}`}
-                      >
-                        <Image
-                          src={attachment.url || "/placeholder.svg"}
-                          alt={fileName}
-                          width={300}
-                          height={200}
-                          className="max-h-40 w-auto rounded object-contain transition-opacity duration-300 opacity-0"
-                          onLoadingComplete={(image) =>
-                            image.classList.remove("opacity-0")
-                          }
-                          onError={(e) =>
-                            (e.currentTarget.src = "/placeholder.svg")
-                          }
-                        />
-                        <span className="block text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">
-                          {fileName} {fileSize}
-                        </span>
-                      </a>
-                    ) : (
-                      <a
-                        href={attachment.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center text-blue-600 hover:underline"
-                        title={`Download file: ${fileName}`}
-                      >
-                        <Paperclip className="h-4 w-4 mr-1 flex-shrink-0" />
-                        <span className="truncate">
-                          {fileName} {fileSize}
-                        </span>
-                      </a>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      );
-    } catch (e) {
-      return (
-        <p className="whitespace-pre-wrap break-words">
-          {String(message.content)}
-        </p>
-      );
+    // Check for the first data structure (top-level attachments)
+    if (message.attachments && Array.isArray(message.attachments)) {
+      content.text = message.content;
+      content.attachments = message.attachments;
     }
+    // Else, try to parse the content as JSON for the second structure
+    else {
+      try {
+        const parsedContent = JSON.parse(message.content);
+        content.text = parsedContent.text || "";
+        content.attachments = parsedContent.attachments || [];
+      } catch (e) {
+        // If parsing fails, it's just a plain text message
+        content.text = message.content;
+      }
+    }
+
+    // 2. Now, render the standardized 'content' object
+    return (
+      <div>
+        {content.text && <p className="mb-2">{content.text}</p>}
+
+        {content.attachments && content.attachments.length > 0 && (
+          <div className="mt-2 space-y-2">
+            {content.attachments.map((attachment, index) => {
+              // The filename might be in 'originalFilename' or 'filename'
+              const filename =
+                attachment.originalFilename ||
+                attachment.filename ||
+                "Attachment";
+              const isImage =
+                attachment.resourceType === "image" ||
+                attachment.resource_type === "image";
+
+              return (
+                <div key={index} className="border rounded p-2 bg-slate-50">
+                  {isImage ? (
+                    <a
+                      href={attachment.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Image
+                        src={attachment.url || "/placeholder.svg"}
+                        alt={filename}
+                        width={300}
+                        height={200}
+                        className="max-h-40 max-w-full rounded object-contain"
+                      />
+                    </a>
+                  ) : (
+                    <a
+                      href={attachment.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center text-blue-600 hover:underline"
+                    >
+                      <Paperclip className="h-4 w-4 mr-1" />
+                      {filename}
+                    </a>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const getStatusIcon = (status) => {

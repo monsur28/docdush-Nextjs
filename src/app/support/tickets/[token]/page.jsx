@@ -48,6 +48,7 @@ export default function SecureTicketPage() {
         }
 
         const ticketData = await ticketResponse.json();
+        console.log("Fetched ticket data:", ticketData);
         setTicket(ticketData);
       } catch (err) {
         console.error("Error fetching ticket:", err);
